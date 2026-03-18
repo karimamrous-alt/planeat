@@ -126,9 +126,24 @@ export function parseIngredients(raw: unknown): Array<{ nom: string; quantite: s
       nom = (obj as string).trim()
     } else if (obj && typeof obj === 'object') {
       const o = obj as Record<string, unknown>
-      nom      = String(o.nom      ?? o.name       ?? o.ingredient ?? '').trim()
-      quantite = String(o.quantite ?? o.quantity    ?? o.qte        ?? o.amount ?? '').trim()
-      unite    = String(o.unite    ?? o.unit        ?? o.mesure     ?? '').trim()
+
+      // Champ raw direct (structure 750g : objet avec raw = texte lisible complet)
+      if (o.raw && String(o.raw).trim().length >= 2) {
+        nom = String(o.raw).trim()
+      } else {
+        const nomCandidate = String(o.nom ?? o.name ?? o.ingredient ?? '').trim()
+        // nom peut lui-même être un JSON stringifié contenant un champ raw
+        if (nomCandidate.startsWith('{')) {
+          try {
+            const inner = JSON.parse(nomCandidate) as Record<string, unknown>
+            nom = String(inner.raw ?? inner.nom ?? inner.name ?? '').trim()
+          } catch { /* ignore, nom reste vide */ }
+        } else {
+          nom      = nomCandidate
+          quantite = String(o.quantite ?? o.quantity ?? o.qte ?? o.amount ?? '').trim()
+          unite    = String(o.unite    ?? o.unit     ?? o.mesure     ?? '').trim()
+        }
+      }
     }
 
     // Sanity checks
