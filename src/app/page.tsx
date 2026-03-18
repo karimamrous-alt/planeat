@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { FAMILLE_ID, getMondayOfWeek, formatDateFr, formatSemaine, CUISINE_CONFIG, JOURS_LABELS, REPAS_LABELS, ALL_SLOTS } from '@/lib/utils'
+import { FAMILLE_ID, getMondayOfWeek, formatDateFr, CUISINE_CONFIG, REPAS_LABELS, ALL_SLOTS } from '@/lib/utils'
 import type { Famille, Menu } from '@/lib/types'
 
 interface RecetteSlot { id: string; nom: string; cuisine: string }
@@ -143,7 +143,7 @@ export default function Accueil() {
             })}
           </div>
         ) : menu ? (
-          <p className="text-gray-400 text-sm">Aucun repas prévu aujourd'hui.</p>
+          <p className="text-gray-400 text-sm">Aucun repas prévu aujourd&apos;hui.</p>
         ) : (
           <div className="text-center py-6">
             <p className="text-gray-400 mb-3">Aucun menu pour cette semaine.</p>

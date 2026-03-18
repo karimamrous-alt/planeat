@@ -139,7 +139,7 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
   }
 
   // Trier par catégorie puis par nom
-  return [...seen.values()].sort((a, b) => {
+  return Array.from(seen.values()).sort((a, b) => {
     if (a.categorie !== b.categorie) return a.categorie.localeCompare(b.categorie)
     return a.nom.localeCompare(b.nom)
   })

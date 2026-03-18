@@ -137,7 +137,7 @@ export default function ListeDeCourses() {
     <div className="text-center py-16 fade-in">
       <p className="text-5xl mb-4">🛒</p>
       <h2 className="text-xl font-bold text-gray-700 mb-2">Aucun menu pour cette semaine</h2>
-      <p className="text-gray-400 mb-6">Générez et validez d'abord votre menu de la semaine.</p>
+      <p className="text-gray-400 mb-6">Générez et validez d&apos;abord votre menu de la semaine.</p>
       <Link href="/menus" className="inline-flex items-center gap-2 bg-green-700 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-800 transition-colors">
         📅 Aller aux menus
       </Link>
@@ -178,7 +178,7 @@ export default function ListeDeCourses() {
             value={nouvelArticle}
             onChange={e => setNouvelArticle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && ajouterArticle()}
-            placeholder="Nom de l'article..."
+            placeholder="Nom de l&apos;article..."
             className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <select

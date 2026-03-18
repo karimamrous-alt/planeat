@@ -222,7 +222,7 @@ export default function Favoris() {
 
                 {/* Commentaire */}
                 {f.commentaire && (
-                  <p className="text-xs text-gray-400 italic mt-2">"{f.commentaire}"</p>
+                  <p className="text-xs text-gray-400 italic mt-2">&ldquo;{f.commentaire}&rdquo;</p>
                 )}
 
                 {/* Lien source */}

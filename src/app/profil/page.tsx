@@ -42,7 +42,7 @@ export default function ProfilFamille() {
   const sauvegarderFamille = async () => {
     setSaving(true)
     await supabase.from('familles').update({ nom: famNom, nb_personnes: famNbP, regime: famRegime }).eq('id', FAMILLE_ID)
-    setFamille(prev => prev ? { ...prev, nom: famNom, nb_personnes: famNbP, regime: famRegime } : prev)
+    setFamille(prev => prev ? { ...prev, nom: famNom, nb_personnes: famNbP, regime: famRegime as import('@/lib/types').Regime } : prev)
     setEditFam(false)
     setSavedOk(true)
     setTimeout(() => setSavedOk(false), 2500)
