@@ -32,10 +32,13 @@ export interface Membre {
   created_at: string
 }
 
+export type TypeRecette = 'entree' | 'plat' | 'dessert' | 'boisson'
+
 export interface Recette {
   id: string
   nom: string
   cuisine: string
+  type: TypeRecette
   ingredients: Ingredient[]
   temps_prep: string
   temps_cuisson: string

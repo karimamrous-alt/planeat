@@ -8,12 +8,67 @@ import { supabase } from '@/lib/supabase'
 import {
   FAMILLE_ID, getMondayOfWeek, addWeeks, formatSemaine,
   ALL_SLOTS, JOURS, JOURS_LABELS, REPAS, REPAS_LABELS,
-  CUISINE_CONFIG, parseMinutes, pickRandom, consolidateIngredients,
+  CUISINE_CONFIG, parseMinutes, consolidateIngredients,
   type SlotKey,
 } from '@/lib/utils'
 import type { Recette } from '@/lib/types'
 
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const JOURS_WEEKEND = new Set(['samedi', 'dimanche'])
+
+const MOTS_INTERDITS = [
+  'porc', 'sanglier', 'jambon', 'lardons', 'lard ',
+  'alcool', 'vin ', 'bière', 'biere', 'champagne', 'cidre',
+  'abats', 'foie ', 'rognons', 'tripes',
+  'fruits de mer', 'crevettes', 'homard', 'moule', 'calmar', 'poulpe',
+  'agneau', 'gigot', 'côtelette d\'agneau',
+  'chorizo', 'pancetta', 'prosciutto', 'saucisson', 'boudin',
+]
+
+const PROTEINES = [
+  { mots: ['poulet', 'dinde', 'blanc de poulet', 'cuisse'], label: 'poulet' },
+  { mots: ['bœuf', 'boeuf', 'steak', 'côte de bœuf', 'filet de bœuf'], label: 'boeuf' },
+  { mots: ['haché', 'kefta', 'merguez'], label: 'hache' },
+  { mots: ['poisson', 'saumon', 'cabillaud', 'thon', 'dorade', 'sole'], label: 'poisson' },
+  { mots: ['légumes', 'legumes', 'végétar', 'vegetar', 'pois chiche', 'lentille'], label: 'legumes' },
+]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function recetteEstValide(r: Recette): boolean {
+  const ingStr = (Array.isArray(r.ingredients) ? r.ingredients : [])
+    .map(i => typeof i === 'string' ? i : (i as { nom?: string }).nom ?? '')
+    .join(' ').toLowerCase()
+  const nomLower = r.nom.toLowerCase()
+  return !MOTS_INTERDITS.some(kw => ingStr.includes(kw) || nomLower.includes(kw))
+}
+
+function detecterProteine(nom: string): string {
+  const n = nom.toLowerCase()
+  for (const p of PROTEINES) {
+    if (p.mots.some(m => n.includes(m))) return p.label
+  }
+  return 'autre'
+}
+
+function pickWeighted(
+  candidates: Recette[],
+  proteineCount: Record<string, number>,
+  rand = Math.random,
+): Recette {
+  const scored = candidates.map(r => {
+    const prot = detecterProteine(r.nom)
+    const protScore = 1 / (1 + (proteineCount[prot] ?? 0))
+    return { r, score: rand() * 0.6 + protScore * 0.4 }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  return scored[0].r
+}
+
 type MenuSlots = Partial<Record<SlotKey, Recette>>
+
+// ── Composant ─────────────────────────────────────────────────────────────────
 
 export default function Menus() {
   const [semaine, setSemaine]       = useState(getMondayOfWeek())
@@ -25,15 +80,19 @@ export default function Menus() {
   const [saving, setSaving]         = useState(false)
   const [savedOk, setSavedOk]       = useState(false)
 
-  // ── Charger le pool de recettes ────────────────────────────────────────
+  // ── Charger le pool (plats valides uniquement) ────────────────────────────
   useEffect(() => {
-    supabase.from('recettes').select('*').then(({ data }) => {
-      const filtered = (data ?? []).filter(r => parseMinutes(r.temps_prep) <= 45)
-      setPool(filtered)
-    })
+    supabase
+      .from('recettes')
+      .select('*')
+      .eq('type', 'plat')
+      .then(({ data }) => {
+        const valides = (data ?? []).filter(recetteEstValide)
+        setPool(valides)
+      })
   }, [])
 
-  // ── Charger le menu de la semaine ──────────────────────────────────────
+  // ── Charger le menu de la semaine ─────────────────────────────────────────
   const chargerMenu = useCallback(async (sem: string) => {
     setLoading(true)
     const { data: menuRow } = await supabase
@@ -44,14 +103,16 @@ export default function Menus() {
     if (!menuRow) { setSlots({}); setMenuId(null); setLoading(false); return }
 
     setMenuId(menuRow.id)
-    const ids = ALL_SLOTS.map(s => (menuRow as Record<string,unknown>)[s]).filter((id): id is string => typeof id === 'string')
+    const ids = ALL_SLOTS
+      .map(s => (menuRow as Record<string, unknown>)[s])
+      .filter((id): id is string => typeof id === 'string')
     if (!ids.length) { setSlots({}); setLoading(false); return }
 
     const { data: recs } = await supabase.from('recettes').select('*').in('id', ids)
     const map = Object.fromEntries((recs ?? []).map(r => [r.id, r]))
     const rebuilt: MenuSlots = {}
     for (const slot of ALL_SLOTS) {
-      const id = (menuRow as Record<string,unknown>)[slot]
+      const id = (menuRow as Record<string, unknown>)[slot]
       if (typeof id === 'string' && map[id]) rebuilt[slot] = map[id]
     }
     setSlots(rebuilt)
@@ -60,29 +121,83 @@ export default function Menus() {
 
   useEffect(() => { chargerMenu(semaine) }, [semaine, chargerMenu])
 
-  // ── Générer tout ───────────────────────────────────────────────────────
+  // ── Génération intelligente ───────────────────────────────────────────────
   const genererTout = () => {
     if (!pool.length) return
     setGenerating(true)
-    const used = new Set<string>()
+
+    const used           = new Set<string>()
+    const proteineCount: Record<string, number> = {}
     const generated: MenuSlots = {}
-    for (const slot of ALL_SLOTS) {
-      const r = pickRandom(pool, used)
-      if (r) { generated[slot] = r; used.add(r.id) }
+
+    for (const jour of JOURS) {
+      const isWeekend      = JOURS_WEEKEND.has(jour)
+      const maxMin         = isWeekend ? 9999 : 45
+      const cuisinesDeJour = new Set<string>()
+
+      for (const repas of REPAS) {
+        const slot = `${jour}_${repas}` as SlotKey
+
+        const candidates = pool.filter(r => {
+          if (used.has(r.id)) return false
+          if (cuisinesDeJour.has(r.cuisine)) return false
+          if (parseMinutes(r.temps_prep) > maxMin) return false
+          return true
+        })
+
+        if (!candidates.length) {
+          // Relaxer la contrainte cuisine si plus de candidats
+          const fallback = pool.filter(r => !used.has(r.id) && parseMinutes(r.temps_prep) <= maxMin)
+          if (!fallback.length) continue
+          const picked = pickWeighted(fallback, proteineCount)
+          generated[slot] = picked
+          used.add(picked.id)
+          cuisinesDeJour.add(picked.cuisine)
+          proteineCount[detecterProteine(picked.nom)] = (proteineCount[detecterProteine(picked.nom)] ?? 0) + 1
+          continue
+        }
+
+        const picked = pickWeighted(candidates, proteineCount)
+        generated[slot] = picked
+        used.add(picked.id)
+        cuisinesDeJour.add(picked.cuisine)
+        const prot = detecterProteine(picked.nom)
+        proteineCount[prot] = (proteineCount[prot] ?? 0) + 1
+      }
     }
+
     setSlots(generated)
     setGenerating(false)
   }
 
-  // ── Régénérer un seul slot ────────────────────────────────────────────
+  // ── Régénérer un seul slot ────────────────────────────────────────────────
   const regenererSlot = (slot: SlotKey) => {
     if (!pool.length) return
-    const used = new Set(Object.entries(slots).filter(([k]) => k !== slot).map(([, v]) => v!.id))
-    const r = pickRandom(pool, used)
-    if (r) setSlots(prev => ({ ...prev, [slot]: r }))
+    const [jour] = slot.split('_') as [string, string]
+    const isWeekend = JOURS_WEEKEND.has(jour)
+    const maxMin    = isWeekend ? 9999 : 45
+
+    const usedIds = new Set(
+      Object.entries(slots).filter(([k]) => k !== slot).map(([, v]) => v!.id)
+    )
+    const candidates = pool.filter(r =>
+      !usedIds.has(r.id) && parseMinutes(r.temps_prep) <= maxMin
+    )
+    if (!candidates.length) return
+
+    const proteineCount: Record<string, number> = {}
+    Object.values(slots).forEach(r => {
+      if (r) {
+        const p = detecterProteine(r.nom)
+        proteineCount[p] = (proteineCount[p] ?? 0) + 1
+      }
+    })
+
+    const picked = pickWeighted(candidates, proteineCount)
+    setSlots(prev => ({ ...prev, [slot]: picked }))
   }
 
-  // ── Valider & sauvegarder ──────────────────────────────────────────────
+  // ── Valider & sauvegarder ─────────────────────────────────────────────────
   const valider = async () => {
     if (Object.keys(slots).length === 0) return
     setSaving(true)
@@ -97,15 +212,12 @@ export default function Menus() {
 
     if (!error && saved) {
       setMenuId(saved.id)
-
-      // Générer la liste de courses
       const recettesMenu = ALL_SLOTS.map(s => slots[s]).filter((r): r is Recette => !!r)
       const consolidated = consolidateIngredients(recettesMenu)
       await supabase.from('liste_courses').upsert(
         { menu_id: saved.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] },
         { onConflict: 'menu_id' }
       )
-
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 3000)
     }
@@ -113,6 +225,12 @@ export default function Menus() {
   }
 
   const nbSlotsFilled = ALL_SLOTS.filter(s => slots[s]).length
+
+  // ── Stats pool ────────────────────────────────────────────────────────────
+  const statsPool = pool.reduce<Record<string, number>>((acc, r) => {
+    acc[r.cuisine] = (acc[r.cuisine] ?? 0) + 1
+    return acc
+  }, {})
 
   return (
     <div className="fade-in space-y-6">
@@ -159,7 +277,17 @@ export default function Menus() {
 
       {/* Info pool */}
       {!loading && pool.length > 0 && (
-        <p className="text-xs text-gray-400">{pool.length} recettes disponibles (≤ 45 min)</p>
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-gray-400">{pool.length} recettes halal disponibles ·</span>
+          {Object.entries(statsPool).map(([cuisine, count]) => {
+            const cfg = CUISINE_CONFIG[cuisine]
+            return cfg ? (
+              <span key={cuisine} className={`text-xs px-2 py-0.5 rounded-full border ${cfg.bgClass} ${cfg.colorClass}`}>
+                {cfg.emoji} {count}
+              </span>
+            ) : null
+          })}
+        </div>
       )}
 
       {/* Grille */}
@@ -174,8 +302,9 @@ export default function Menus() {
             <div className="grid grid-cols-8 gap-2 mb-2">
               <div className="col-span-1" />
               {JOURS.map(jour => (
-                <div key={jour} className="col-span-1 text-center text-xs font-bold text-gray-600 uppercase tracking-wide py-2">
+                <div key={jour} className={`col-span-1 text-center text-xs font-bold uppercase tracking-wide py-2 ${JOURS_WEEKEND.has(jour) ? 'text-orange-500' : 'text-gray-600'}`}>
                   {JOURS_LABELS[jour].slice(0, 3)}
+                  {JOURS_WEEKEND.has(jour) && <span className="block text-orange-300 text-[9px] normal-case tracking-normal">week-end</span>}
                 </div>
               ))}
             </div>
@@ -191,7 +320,9 @@ export default function Menus() {
                 {JOURS.map(jour => {
                   const slot = `${jour}_${repas}` as SlotKey
                   const recette = slots[slot]
-                  const cfg = recette ? (CUISINE_CONFIG[recette.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-500' }) : null
+                  const cfg = recette
+                    ? (CUISINE_CONFIG[recette.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-500' })
+                    : null
 
                   return (
                     <div key={slot} className="col-span-1">
@@ -242,7 +373,7 @@ export default function Menus() {
 
       {!loading && pool.length === 0 && (
         <div className="text-center py-8 bg-amber-50 border border-amber-200 rounded-2xl">
-          <p className="text-amber-700">Aucune recette disponible avec ces filtres (≤ 45 min).</p>
+          <p className="text-amber-700">Aucune recette halal disponible.</p>
         </div>
       )}
     </div>
