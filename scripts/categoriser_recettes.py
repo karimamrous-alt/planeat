@@ -20,12 +20,13 @@ HEADERS = {
 BOISSON_KW = [
     "thé ", "café", "jus ", "smoothie", "limonade", "cocktail", "infusion",
     "boisson", "milkshake", "lassi", "ayran", "lait chaud", "citronnade",
-    "sirop", "tisane",
+    "sirop", "tisane", "cappuccino", "chocolat chaud",
 ]
 
 DESSERT_KW = [
     "gâteau", "gateau", "cake", "tarte ", "tartelette", "mousse au chocolat",
     "mousse ", "flan", "tiramisu", "brownie", "cookie", "biscuit", "fondant",
+    "au chocolat", "chocolat noir", "chocolat blanc", "tablette de chocolat",
     "clafoutis", "crumble", "charlotte ", "madeleine", "macaron", "éclair",
     "profiterole", "baklava", "chebakia", "makrout", "sellou", "halwa",
     "m'hancha", "briouats au miel", "bastilla sucrée", "cornes de gazelle",

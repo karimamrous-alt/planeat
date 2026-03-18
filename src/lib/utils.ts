@@ -118,12 +118,19 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
   const seen = new Map<string, ArticleCourses>()
 
   for (const recette of recettesList) {
-    const ingredients = Array.isArray(recette.ingredients) ? recette.ingredients : []
-    for (const ing of ingredients) {
+    const ingredients = (Array.isArray(recette.ingredients) ? recette.ingredients : []) as unknown[]
+    for (const raw of ingredients) {
+      // Dépaqueter les objets JSON sérialisés en string
+      let ing: unknown = raw
+      if (typeof raw === 'string' && (raw as string).trim().startsWith('{')) {
+        try { ing = JSON.parse(raw as string) } catch { /* garder tel quel */ }
+      }
+
       const nom = (typeof ing === 'string' ? ing : (ing as { nom?: string }).nom ?? '').trim()
-      // Ignorer les blobs JSON et les chaînes trop longues ou malformées
+      // Ignorer les blobs JSON, icônes et chaînes malformées
       if (!nom || nom.length < 2 || nom.length > 120) continue
       if (nom.startsWith('{') || nom.startsWith('[')) continue
+      if (/\bicon\b/i.test(nom)) continue
 
       // Clé de déduplication : nom normalisé
       const cle = nom.toLowerCase().replace(/\s+/g, ' ')
@@ -131,8 +138,8 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
       if (!seen.has(cle)) {
         seen.set(cle, {
           nom,
-          quantite: typeof ing === 'object' ? String((ing as { quantite?: unknown }).quantite ?? '') : '',
-          unite:    typeof ing === 'object' ? String((ing as { unite?: unknown }).unite ?? '') : '',
+          quantite: typeof ing === 'object' && ing !== null ? String((ing as { quantite?: unknown }).quantite ?? '') : '',
+          unite:    typeof ing === 'object' && ing !== null ? String((ing as { unite?: unknown }).unite ?? '') : '',
           categorie: categoriserIngredient(nom),
           coche: false,
         })

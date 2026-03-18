@@ -22,14 +22,15 @@ const MOTS_INTERDITS = [
   'alcool', 'vin ', 'bière', 'biere', 'champagne', 'cidre',
   'abats', 'foie ', 'rognons', 'tripes',
   'fruits de mer', 'crevettes', 'homard', 'moule', 'calmar', 'poulpe',
-  'agneau', 'gigot', 'côtelette d\'agneau',
-  'chorizo', 'pancetta', 'prosciutto', 'saucisson', 'boudin',
+  'agneau', 'gigot', 'côtelette d\'agneau', 'mouton',
+  'chorizo', 'pancetta', 'prosciutto', 'saucisson', 'boudin', 'merguez',
+  'cappuccino', 'chocolat chaud',
 ]
 
 const PROTEINES = [
   { mots: ['poulet', 'dinde', 'blanc de poulet', 'cuisse'], label: 'poulet' },
   { mots: ['bœuf', 'boeuf', 'steak', 'côte de bœuf', 'filet de bœuf'], label: 'boeuf' },
-  { mots: ['haché', 'kefta', 'merguez'], label: 'hache' },
+  { mots: ['haché', 'kefta'], label: 'hache' },
   { mots: ['poisson', 'saumon', 'cabillaud', 'thon', 'dorade', 'sole'], label: 'poisson' },
   { mots: ['légumes', 'legumes', 'végétar', 'vegetar', 'pois chiche', 'lentille'], label: 'legumes' },
 ]
@@ -391,8 +392,26 @@ export default function Menus() {
 
 // ── Modal détail recette ──────────────────────────────────────────────────────
 
+const NB_FAMILLE = 6
+
 function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => void }) {
   const cfg = CUISINE_CONFIG[recette.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-600' }
+
+  // Adaptation quantités × (6 / nb_personnes_recette)
+  const nbRecette = (() => {
+    const m = String(recette.nb_personnes ?? '').match(/\d+/)
+    return m ? parseInt(m[0]) : 0
+  })()
+  const ratio = nbRecette > 1 ? NB_FAMILLE / nbRecette : 1
+
+  const scaleQty = (q: string): string => {
+    if (!q || ratio === 1) return q
+    const m = q.match(/^(\d+(?:[.,]\d+)?)(.*)$/)
+    if (!m) return q
+    const num = parseFloat(m[1].replace(',', '.')) * ratio
+    const rounded = Math.round(num * 10) / 10
+    return `${rounded}${m[2]}`
+  }
 
   // Fermer sur Escape
   useEffect(() => {
@@ -401,14 +420,28 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const seenIng = new Set<string>()
   const ingredients = (Array.isArray(recette.ingredients) ? recette.ingredients as unknown[] : [])
     .map(ing => {
-      if (typeof ing === 'string') return ing.trim()
-      const i = ing as { nom?: string; quantite?: string; unite?: string }
-      const q = [i.quantite, i.unite].filter(Boolean).join(' ')
+      // Dépaqueter les objets JSON sérialisés en string
+      let obj: unknown = ing
+      if (typeof ing === 'string' && ing.trim().startsWith('{')) {
+        try { obj = JSON.parse(ing) } catch { /* garder */ }
+      }
+      if (typeof obj === 'string') return obj.trim()
+      const i = obj as { nom?: string; quantite?: string; unite?: string }
+      const q = [i.quantite ? scaleQty(i.quantite) : '', i.unite].filter(Boolean).join('\u00a0')
       return q ? `${q} ${i.nom ?? ''}`.trim() : (i.nom ?? '').trim()
     })
-    .filter(s => s && s.length > 1 && s.length < 120 && !s.startsWith('{'))
+    .filter(s => {
+      if (!s || s.length < 2 || s.length > 120) return false
+      if (s.startsWith('{') || s.startsWith('[')) return false
+      if (/\bicon\b/i.test(s)) return false
+      const key = s.toLowerCase().replace(/\s+/g, ' ')
+      if (seenIng.has(key)) return false
+      seenIng.add(key)
+      return true
+    })
 
   const instructions: string[] = Array.isArray(recette.instructions) ? recette.instructions : []
 
@@ -455,7 +488,7 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
             )}
             {recette.nb_personnes && (
               <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
-                👤 {recette.nb_personnes}
+                👤 {nbRecette > 0 && nbRecette !== NB_FAMILLE ? `Pour ${NB_FAMILLE} personnes` : recette.nb_personnes}
               </span>
             )}
             {recette.difficulte && (
@@ -470,7 +503,14 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
           {/* Ingrédients */}
           {ingredients.length > 0 && (
             <div className="mb-5">
-              <h3 className="font-bold text-gray-700 mb-3">Ingrédients</h3>
+              <h3 className="font-bold text-gray-700 mb-3">
+                Ingrédients
+                {ratio !== 1 && (
+                  <span className="ml-2 text-xs font-normal text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                    adapté pour {NB_FAMILLE} pers.
+                  </span>
+                )}
+              </h3>
               <ul className="space-y-1.5">
                 {ingredients.map((ing, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
