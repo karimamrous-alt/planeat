@@ -147,11 +147,8 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
     }
   }
 
-  // Trier par catégorie puis par nom
-  return Array.from(seen.values()).sort((a, b) => {
-    if (a.categorie !== b.categorie) return a.categorie.localeCompare(b.categorie)
-    return a.nom.localeCompare(b.nom)
-  })
+  // Trier alphabétiquement par nom
+  return Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
 }
 
 // ─── Affichage étoiles ─────────────────────────────────────────────────────

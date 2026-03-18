@@ -1,6 +1,8 @@
 """
 Catégorise les recettes existantes en base Supabase avec un champ `type`.
 Types : entree | plat | dessert | boisson
+Les accompagnements (naan, pain, pita…) sont classés en 'entree' faute de type dédié ;
+le frontend les exclut de tous les pools de génération.
 """
 import os, sys, json, time
 import urllib.request, urllib.error
@@ -25,18 +27,24 @@ BOISSON_KW = [
 
 DESSERT_KW = [
     "gâteau", "gateau", "cake", "tarte ", "tartelette", "mousse au chocolat",
-    "mousse ", "flan", "tiramisu", "brownie", "cookie", "biscuit", "fondant",
-    "au chocolat", "chocolat noir", "chocolat blanc", "tablette de chocolat",
+    "mousse ", "flan", "tiramisu", "brownie", "cookie", "biscuit", "sablé", "fondant",
+    "au chocolat", "chocolat noir", "chocolat blanc",
     "clafoutis", "crumble", "charlotte ", "madeleine", "macaron", "éclair",
     "profiterole", "baklava", "chebakia", "makrout", "sellou", "halwa",
     "m'hancha", "briouats au miel", "bastilla sucrée", "cornes de gazelle",
     "crème brûlée", "panna cotta", "île flottante", "riz au lait",
     "moelleux", "financier", "quatre-quarts", "muffin", "cupcake",
-    "cheesecake", "entremets", "vacherin", "millefeuille", "Paris-Brest",
-    "tarte tatin", "frangipane", "pudding", "kompot", "halwa",
+    "cheesecake", "entremets", "vacherin", "millefeuille", "paris-brest",
+    "tarte tatin", "frangipane", "pudding", "kompot",
     "gulab jamun", "ladoo", "kheer", "rasmalai", "jalebi", "barfi",
     "firni", "sheer khurma", "zerde", "borek sucré",
     "dessert", "sorbet", "glace ", "parfait glacé",
+]
+
+# Accompagnements classés en 'entree' (pas de type dédié en base)
+ACCOMPAGNEMENT_KW = [
+    "naan", "naans", "pain ", "pita", "chapati", "pain plat",
+    "focaccia", "baguette",
 ]
 
 ENTREE_KW = [
@@ -52,15 +60,10 @@ BOISSON_MOTS_EXCLUS_PLAT = ["jus de citron", "jus de tomate", "jus de cuisson"]
 
 def detecter_type(nom: str, ingredients: list) -> str:
     nom_lower = nom.lower()
-    ing_str   = " ".join(
-        (i if isinstance(i, str) else i.get("nom", "")).lower()
-        for i in ingredients
-    )
 
     # Boisson en premier (priorité absolue)
     for kw in BOISSON_KW:
         if kw in nom_lower:
-            # Éviter les faux positifs "jus de citron dans une recette"
             if kw.strip() in ["jus ", "sirop"] and any(e in nom_lower for e in BOISSON_MOTS_EXCLUS_PLAT):
                 continue
             return "boisson"
@@ -69,6 +72,11 @@ def detecter_type(nom: str, ingredients: list) -> str:
     for kw in DESSERT_KW:
         if kw in nom_lower:
             return "dessert"
+
+    # Accompagnements → entree (exclus du planning côté frontend)
+    for kw in ACCOMPAGNEMENT_KW:
+        if kw in nom_lower:
+            return "entree"
 
     # Entrée
     for kw in ENTREE_KW:
