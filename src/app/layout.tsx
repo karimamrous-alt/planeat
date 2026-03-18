@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/Navigation'
+import { VERSION, VERSION_DATE } from '@/lib/version'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,6 +25,9 @@ export default function RootLayout({
         <main className="max-w-6xl mx-auto px-4 py-8">
           {children}
         </main>
+        <footer className="text-center py-4 text-xs text-gray-300">
+          {VERSION} · {VERSION_DATE}
+        </footer>
       </body>
     </html>
   )
