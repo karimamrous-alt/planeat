@@ -87,7 +87,7 @@ export default function Accueil() {
           <div>
             <p className="text-green-200 text-sm font-medium mb-1 capitalize">{formatDateFr()}</p>
             <h1 className="text-3xl font-bold mb-2">
-              Bonjour, {famille?.nom ?? 'Notre famille'} ! 👋
+              Bonjour, {famille?.nom ?? 'Lucie'} ! 👋
             </h1>
             <p className="text-green-100">
               {nbRepasPlannifies > 0
