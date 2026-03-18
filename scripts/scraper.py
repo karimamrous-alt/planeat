@@ -32,8 +32,14 @@ CATEGORIES = {
     "française":  "https://www.750g.com/recettes_cuisine_francaise.htm",
 }
 
-MAX_PAGES_PAR_CATEGORIE = 5   # Augmenter pour scraper plus de recettes
-DELAI_ENTRE_REQUETES    = 1.5  # secondes — respecter le serveur
+MAX_PAGES_PAR_CATEGORIE = {
+    "marocaine": 15,
+    "indienne":  10,
+    "afghane":    5,
+    "italienne": 15,
+    "française": 10,
+}
+DELAI_ENTRE_REQUETES = 3.0  # secondes — respecter le serveur
 OUTPUT_FILE = Path(__file__).parent / "recettes.json"
 
 HEADERS = {
@@ -58,17 +64,22 @@ MOTS_CLES_EXCLUSION = {
 # Utilitaires
 # ---------------------------------------------------------------------------
 
-def get(url: str, retries: int = 3) -> BeautifulSoup | None:
-    """GET avec retry et délai."""
+def get(url: str, retries: int = 4) -> BeautifulSoup | None:
+    """GET avec retry, backoff exponentiel et gestion du 429."""
     for tentative in range(retries):
         try:
             r = requests.get(url, headers=HEADERS, timeout=15)
+            if r.status_code == 429:
+                attente = 30 * (tentative + 1)   # 30s, 60s, 90s, 120s
+                print(f"  [429] Limite atteinte, pause {attente}s...")
+                time.sleep(attente)
+                continue
             r.raise_for_status()
             r.encoding = r.apparent_encoding
             return BeautifulSoup(r.text, "html.parser")
         except requests.RequestException as e:
-            print(f"  [!] Erreur ({tentative+1}/{retries}) {url} → {e}")
-            time.sleep(2 * (tentative + 1))
+            print(f"  [!] Erreur ({tentative+1}/{retries}) {url} -> {e}")
+            time.sleep(5 * (tentative + 1))
     return None
 
 
@@ -283,47 +294,91 @@ def extraire_liens_recettes(soup: BeautifulSoup, base_url: str) -> list[str]:
     return liens
 
 
-def scraper_categorie(nom_categorie: str, url_base: str) -> list[dict]:
-    """Scrape toutes les pages d'une catégorie."""
+def scraper_categorie(nom_categorie: str, url_base: str) -> tuple[list[dict], int]:
+    """Scrape toutes les pages d'une catégorie. Retourne (recettes_retenues, nb_filtrées)."""
     recettes = []
+    nb_filtrees = 0
+    max_pages = MAX_PAGES_PAR_CATEGORIE[nom_categorie]
+    urls_deja_vues_global: set[str] = set()   # pour détecter les pages qui se répètent
     print(f"\n{'='*60}")
-    print(f"  Catégorie : {nom_categorie.upper()}")
+    print(f"  Categorie : {nom_categorie.upper()} ({max_pages} pages max)")
     print(f"{'='*60}")
 
-    for num_page in range(1, MAX_PAGES_PAR_CATEGORIE + 1):
+    for num_page in range(1, max_pages + 1):
         url_page = url_base if num_page == 1 else f"{url_base}?page={num_page}"
-        print(f"\n  Page {num_page}/{MAX_PAGES_PAR_CATEGORIE} → {url_page}")
+        print(f"\n  Page {num_page}/{max_pages} -> {url_page}")
 
         soup = get(url_page)
         if not soup:
-            print("  [!] Page inaccessible, arrêt de cette catégorie.")
-            break
+            print("  [!] Page inaccessible, on passe a la suivante.")
+            continue
 
         liens = extraire_liens_recettes(soup, url_base)
         if not liens:
-            print("  [!] Aucune recette trouvée sur cette page, fin de catégorie.")
+            print("  [!] Aucune recette trouvee sur cette page, fin de categorie.")
             break
 
-        print(f"  → {len(liens)} recettes trouvées")
+        # Détecter si la page renvoie les mêmes URLs que les pages précédentes
+        # (pagination JS non supportée → toutes les pages identiques)
+        nouveaux_liens = [l for l in liens if l not in urls_deja_vues_global]
+        if not nouveaux_liens and num_page > 1:
+            print(f"  [!] Page identique a la precedente (pagination JS) - fin de categorie.")
+            break
+        urls_deja_vues_global.update(liens)
 
-        for i, url_recette in enumerate(liens, 1):
-            print(f"    [{i}/{len(liens)}] {url_recette.split('/')[-1]}", end=" ")
+        nouveaux = len(nouveaux_liens)
+        print(f"  -> {len(liens)} recettes sur la page, {nouveaux} nouvelles")
+
+        for i, url_recette in enumerate(nouveaux_liens, 1):
+            print(f"    [{i}/{nouveaux}] {url_recette.split('/')[-1]}", end=" ")
+            sys.stdout.flush()
             time.sleep(DELAI_ENTRE_REQUETES)
 
             recette = scraper_recette(url_recette, nom_categorie)
             if recette:
                 recettes.append(recette)
-                print(f"✓ ({recette['nb_ingredients']} ingr.)")
+                print(f"OK ({recette['nb_ingredients']} ingr.)")
             else:
-                if recette is None:
-                    # Message déjà affiché dans scraper_recette si filtré,
-                    # sinon c'est une erreur réseau
-                    pass
+                nb_filtrees += 1
+                # Message de filtrage deja affiche dans scraper_recette
 
         # Pause entre les pages
         time.sleep(DELAI_ENTRE_REQUETES * 2)
 
-    return recettes
+    return recettes, nb_filtrees
+
+
+# ---------------------------------------------------------------------------
+# Sauvegarde
+# ---------------------------------------------------------------------------
+
+def _sauvegarder(recettes: list[dict], stats: dict) -> None:
+    """Déduplique et sauvegarde les recettes dans recettes.json."""
+    vues: set[str] = set()
+    uniques = []
+    for r in recettes:
+        if r["url"] not in vues:
+            vues.add(r["url"])
+            uniques.append(r)
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "meta": {
+                    "total": len(uniques),
+                    "categories": {
+                        cat: sum(1 for r in uniques if r["categorie"] == cat)
+                        for cat in CATEGORIES
+                    },
+                    "filtres_appliques": sorted(MOTS_CLES_EXCLUSION),
+                },
+                "recettes": uniques,
+            },
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+    print(f"  [sauvegarde] {len(uniques)} recettes uniques -> {OUTPUT_FILE.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -331,63 +386,53 @@ def scraper_categorie(nom_categorie: str, url_base: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def main():
-    print("🍽️  Scraper 750g.com — Démarrage")
-    print(f"   Catégories : {', '.join(CATEGORIES.keys())}")
-    print(f"   Pages max/catégorie : {MAX_PAGES_PAR_CATEGORIE}")
+    print("Scraper 750g.com - Demarrage")
+    print(f"   Categories : {', '.join(CATEGORIES.keys())}")
+    for cat, n in MAX_PAGES_PAR_CATEGORIE.items():
+        print(f"   {cat:15s} : {n} pages max")
     print(f"   Sortie : {OUTPUT_FILE}\n")
 
     toutes_recettes = []
+    stats = {}  # {categorie: {"retenues": n, "filtrees": n}}
 
     for nom_cat, url_cat in CATEGORIES.items():
         try:
-            recettes_cat = scraper_categorie(nom_cat, url_cat)
+            recettes_cat, nb_filtrees = scraper_categorie(nom_cat, url_cat)
             toutes_recettes.extend(recettes_cat)
-            print(f"\n  ✅ {nom_cat} : {len(recettes_cat)} recettes retenues")
+            stats[nom_cat] = {"retenues": len(recettes_cat), "filtrees": nb_filtrees}
+            print(f"\n  >> {nom_cat} : {len(recettes_cat)} retenues, {nb_filtrees} filtrees (porc)")
         except KeyboardInterrupt:
-            print("\n\n[!] Interruption — sauvegarde des recettes collectées...")
+            print("\n\n[!] Interruption - sauvegarde des recettes collectees...")
             break
         except Exception as e:
             print(f"\n  [!] Erreur inattendue pour '{nom_cat}' : {e}")
+            stats[nom_cat] = {"retenues": 0, "filtrees": 0}
             continue
+        finally:
+            # Sauvegarde incrementale apres chaque categorie
+            if toutes_recettes:
+                _sauvegarder(toutes_recettes, stats)
 
-    # Déduplication par URL
-    vues = set()
-    recettes_uniques = []
-    for r in toutes_recettes:
-        if r["url"] not in vues:
-            vues.add(r["url"])
-            recettes_uniques.append(r)
+    # Sauvegarde finale
+    _sauvegarder(toutes_recettes, stats)
 
-    # Sauvegarde
-    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "meta": {
-                    "total":      len(recettes_uniques),
-                    "categories": {
-                        cat: sum(1 for r in recettes_uniques if r["categorie"] == cat)
-                        for cat in CATEGORIES
-                    },
-                    "filtres_appliques": sorted(MOTS_CLES_EXCLUSION),
-                },
-                "recettes": recettes_uniques,
-            },
-            f,
-            ensure_ascii=False,
-            indent=2,
-        )
+    # Résumé final
+    recettes_uniques = list({r["url"]: r for r in toutes_recettes}.values())
+    total_retenues = len(recettes_uniques)
+    total_filtrees = sum(s["filtrees"] for s in stats.values())
 
     print(f"\n{'='*60}")
-    print(f"✅ TERMINÉ — {len(recettes_uniques)} recettes sauvegardées")
-    print(f"   Fichier : {OUTPUT_FILE}")
+    print(f"TERMINE - {total_retenues} recettes sauvegardees dans {OUTPUT_FILE.name}")
     print(f"{'='*60}")
-
-    # Résumé par catégorie
-    print("\nRésumé par catégorie :")
+    print(f"\n{'CUISINE':<18} {'RETENUES':>10} {'FILTREES (porc)':>16} {'PAGES':>7}")
+    print("-" * 55)
     for cat in CATEGORIES:
-        n = sum(1 for r in recettes_uniques if r["categorie"] == cat)
-        print(f"  {cat:15s} → {n} recettes")
+        s = stats.get(cat, {"retenues": 0, "filtrees": 0})
+        pages = MAX_PAGES_PAR_CATEGORIE[cat]
+        print(f"  {cat:<16} {s['retenues']:>10} {s['filtrees']:>16} {pages:>7}")
+    print("-" * 55)
+    print(f"  {'TOTAL':<16} {total_retenues:>10} {total_filtrees:>16}")
+    print(f"\n  Fichier : {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":
