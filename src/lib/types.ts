@@ -50,6 +50,8 @@ export interface Recette {
   nb_votes: number
   niveau_epices: NiveauEpices
   source_url: string
+  image_url: string | null
+  instructions: string[]
   tags: string[]
   created_at: string
 }

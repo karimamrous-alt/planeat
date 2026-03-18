@@ -121,7 +121,9 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
     const ingredients = Array.isArray(recette.ingredients) ? recette.ingredients : []
     for (const ing of ingredients) {
       const nom = (typeof ing === 'string' ? ing : (ing as { nom?: string }).nom ?? '').trim()
-      if (!nom || nom.length < 2) continue
+      // Ignorer les blobs JSON et les chaînes trop longues ou malformées
+      if (!nom || nom.length < 2 || nom.length > 120) continue
+      if (nom.startsWith('{') || nom.startsWith('[')) continue
 
       // Clé de déduplication : nom normalisé
       const cle = nom.toLowerCase().replace(/\s+/g, ' ')
