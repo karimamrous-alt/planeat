@@ -30,7 +30,7 @@ DESSERT_KW = [
     "mousse ", "flan", "tiramisu", "brownie", "cookie", "biscuit", "sablé", "fondant",
     "au chocolat", "chocolat noir", "chocolat blanc",
     "clafoutis", "crumble", "charlotte ", "madeleine", "macaron", "éclair",
-    "profiterole", "baklava", "chebakia", "makrout", "sellou", "halwa",
+    "profiterole", "baklava", "chebakia", "makrout", "makroud", "sellou", "halwa",
     "m'hancha", "briouats au miel", "bastilla sucrée", "cornes de gazelle",
     "crème brûlée", "panna cotta", "île flottante", "riz au lait",
     "moelleux", "financier", "quatre-quarts", "muffin", "cupcake",
@@ -39,6 +39,9 @@ DESSERT_KW = [
     "gulab jamun", "ladoo", "kheer", "rasmalai", "jalebi", "barfi",
     "firni", "sheer khurma", "zerde", "borek sucré",
     "dessert", "sorbet", "glace ", "parfait glacé",
+    # Pâtisseries orientales supplémentaires
+    "ghriba", "msemen sucré", "baghrir", "briouate sucrée", "briouates sucrées",
+    "shebakia", "chebakiya", "kaab el ghzal", "fekkas",
 ]
 
 # Accompagnements classés en 'entree' (pas de type dédié en base)

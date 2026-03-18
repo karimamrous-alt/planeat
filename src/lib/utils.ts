@@ -20,8 +20,8 @@ export const JOURS_LABELS: Record<string, string> = {
 export const REPAS = ['dejeuner', 'diner'] as const
 export const REPAS_LABELS: Record<string, string> = { dejeuner: '🌞 Déjeuner', diner: '🌙 Dîner' }
 
-export type Jour   = typeof JOURS[number]
-export type Repas  = typeof REPAS[number]
+export type Jour    = typeof JOURS[number]
+export type Repas   = typeof REPAS[number]
 export type SlotKey = `${Jour}_${Repas}`
 
 export const ALL_SLOTS: SlotKey[] = JOURS.flatMap(j => REPAS.map(r => `${j}_${r}` as SlotKey))
@@ -64,12 +64,87 @@ export function parseMinutes(temps: string | null | undefined): number {
   return total === 0 ? 999 : total
 }
 
+// ─── Calories ──────────────────────────────────────────────────────────────
+
+export function parseCalories(cal: string | null | undefined): number {
+  if (!cal) return 0
+  const m = String(cal).match(/\d+/)
+  return m ? parseInt(m[0]) : 0
+}
+
 // ─── Sélection aléatoire ───────────────────────────────────────────────────
 
 export function pickRandom<T>(arr: T[], exclude: Set<string> = new Set(), getId: (t: T) => string = (t: unknown) => (t as { id: string }).id): T | null {
   const available = arr.filter(t => !exclude.has(getId(t)))
   if (!available.length) return arr[Math.floor(Math.random() * arr.length)] ?? null
   return available[Math.floor(Math.random() * available.length)]
+}
+
+// ─── Parsing d'ingrédients ─────────────────────────────────────────────────
+// Accepte tout format (string, objet, JSON stringifié, tableau) et retourne
+// toujours une liste propre de { nom, quantite, unite }.
+
+export function parseIngredients(raw: unknown): Array<{ nom: string; quantite: string; unite: string }> {
+  // Normaliser en tableau
+  let items: unknown[]
+  if (raw === null || raw === undefined) return []
+  if (typeof raw === 'string') {
+    const t = (raw as string).trim()
+    if (!t) return []
+    if (t.startsWith('[') || t.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(t)
+        items = Array.isArray(parsed) ? parsed : [parsed]
+      } catch { items = [raw] }
+    } else {
+      items = [raw]
+    }
+  } else if (Array.isArray(raw)) {
+    items = raw
+  } else if (typeof raw === 'object') {
+    items = [raw]
+  } else {
+    return []
+  }
+
+  const seen = new Set<string>()
+  const result: Array<{ nom: string; quantite: string; unite: string }> = []
+
+  for (const item of items) {
+    // Dépaqueter les JSON stringifiés
+    let obj: unknown = item
+    if (typeof item === 'string') {
+      const t = (item as string).trim()
+      if (t.startsWith('{')) {
+        try { obj = JSON.parse(t) } catch { obj = item }
+      }
+    }
+
+    let nom = '', quantite = '', unite = ''
+
+    if (typeof obj === 'string') {
+      nom = (obj as string).trim()
+    } else if (obj && typeof obj === 'object') {
+      const o = obj as Record<string, unknown>
+      nom      = String(o.nom      ?? o.name       ?? o.ingredient ?? '').trim()
+      quantite = String(o.quantite ?? o.quantity    ?? o.qte        ?? o.amount ?? '').trim()
+      unite    = String(o.unite    ?? o.unit        ?? o.mesure     ?? '').trim()
+    }
+
+    // Sanity checks
+    if (!nom || nom.length < 2 || nom.length > 120) continue
+    if (nom.startsWith('{') || nom.startsWith('[')) continue
+    if (/\bicon\b/i.test(nom)) continue
+    if (/^[\d\s.,/]+$/.test(nom)) continue  // chaîne purement numérique
+
+    const key = nom.toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    result.push({ nom, quantite, unite })
+  }
+
+  return result
 }
 
 // ─── Catégorisation ingrédients ────────────────────────────────────────────
@@ -79,8 +154,8 @@ const CATEGORIES_KEYWORDS: [string, string[]][] = [
     'salade', 'concombre', 'ail', 'échalote', 'champignon', 'navet', 'haricot vert', 'brocoli', 'chou',
     'fenouil', 'céleri', 'artichaut', 'asperge', 'radis', 'betterave', 'maïs', 'petit pois', 'potiron',
     'courge', 'gombo', 'pak choi', 'fenugrec', 'menthe fraîche', 'coriandre fraîche']],
-  ['Viandes & Volailles', ['poulet', 'bœuf', 'veau', 'agneau', 'dinde', 'canard', 'lapin', 'merguez',
-    'kefta', 'steak', 'haché', 'escalope', 'blanc de poulet', 'cuisse', 'gigot', 'côte', 'rôti',
+  ['Viandes & Volailles', ['poulet', 'bœuf', 'veau', 'dinde', 'canard', 'lapin',
+    'kefta', 'steak', 'haché', 'escalope', 'blanc de poulet', 'cuisse', 'côte', 'rôti',
     'filet de bœuf', 'viande']],
   ['Poissons', ['saumon', 'thon', 'cabillaud', 'dorade', 'sole', 'merlan', 'truite', 'sardine',
     'maquereau', 'bar', 'crevette', 'moule', 'calmar', 'anchois']],
@@ -96,7 +171,7 @@ const CATEGORIES_KEYWORDS: [string, string[]][] = [
   ['Épices & Aromates', ['sel', 'poivre', 'cumin', 'curcuma', 'gingembre', 'paprika', 'cannelle',
     'muscade', 'curry', 'ras el hanout', 'harissa', 'safran', 'anis', 'thym', 'romarin', 'basilic',
     'coriandre', 'persil', 'menthe', 'origan', 'laurier', 'cardamome', 'clou de girofle', 'badiane',
-    'sumac', 'za\'atar', 'fenugrec']],
+    'sumac', "za'atar", 'fenugrec']],
   ['Épicerie & Condiments', ['huile', 'vinaigre', 'moutarde', 'sauce soja', 'sucre', 'miel', 'fécule',
     'levure', 'bouillon', 'concentré de tomate', 'coulis', 'lait de coco', 'tahini', 'purée',
     'bicarbonate', 'extrait', 'vanille', 'chocolat', 'cacao', 'sirop']],
@@ -118,36 +193,20 @@ export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[
   const seen = new Map<string, ArticleCourses>()
 
   for (const recette of recettesList) {
-    const ingredients = (Array.isArray(recette.ingredients) ? recette.ingredients : []) as unknown[]
-    for (const raw of ingredients) {
-      // Dépaqueter les objets JSON sérialisés en string
-      let ing: unknown = raw
-      if (typeof raw === 'string' && (raw as string).trim().startsWith('{')) {
-        try { ing = JSON.parse(raw as string) } catch { /* garder tel quel */ }
-      }
-
-      const nom = (typeof ing === 'string' ? ing : (ing as { nom?: string }).nom ?? '').trim()
-      // Ignorer les blobs JSON, icônes et chaînes malformées
-      if (!nom || nom.length < 2 || nom.length > 120) continue
-      if (nom.startsWith('{') || nom.startsWith('[')) continue
-      if (/\bicon\b/i.test(nom)) continue
-
-      // Clé de déduplication : nom normalisé
-      const cle = nom.toLowerCase().replace(/\s+/g, ' ')
-
+    for (const ing of parseIngredients(recette.ingredients)) {
+      const cle = ing.nom.toLowerCase().replace(/\s+/g, ' ')
       if (!seen.has(cle)) {
         seen.set(cle, {
-          nom,
-          quantite: typeof ing === 'object' && ing !== null ? String((ing as { quantite?: unknown }).quantite ?? '') : '',
-          unite:    typeof ing === 'object' && ing !== null ? String((ing as { unite?: unknown }).unite ?? '') : '',
-          categorie: categoriserIngredient(nom),
-          coche: false,
+          nom:       ing.nom,
+          quantite:  ing.quantite,
+          unite:     ing.unite,
+          categorie: categoriserIngredient(ing.nom),
+          coche:     false,
         })
       }
     }
   }
 
-  // Trier alphabétiquement par nom
   return Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
 }
 
