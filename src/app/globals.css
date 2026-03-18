@@ -2,26 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
+:root { --primary: #15803d; --accent: #f97316; }
+html { color-scheme: light; }
+body { background: #f9fafb; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+@layer utilities { .text-balance { text-wrap: balance; } }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.25s ease-out; }
+@keyframes spin-anim { to { transform: rotate(360deg); } }
+.spinner { display:inline-block; width:1.25rem; height:1.25rem; border:2px solid currentColor; border-top-color:transparent; border-radius:9999px; animation:spin-anim 0.7s linear infinite; }
