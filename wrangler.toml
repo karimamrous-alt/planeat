@@ -2,3 +2,6 @@ name = "planeat"
 compatibility_date = "2026-03-18"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
+
+[pages.build_config]
+build_command = "npx @cloudflare/next-on-pages"
