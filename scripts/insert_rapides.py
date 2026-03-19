@@ -1,132 +1,195 @@
-"""Insert 10 recettes express (≤15 min) dans Supabase."""
+"""Insert 10 recettes express midi semaine (≤15 min total) dans Supabase.
+Cuisines : française ou italienne uniquement (contrainte slot déjeuner semaine).
+"""
 
 import json
 import os
 import urllib.request
+import urllib.error
+import urllib.parse
 
 SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "https://zbbachjfmcmzunbsovps.supabase.co")
 SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 RECETTES = [
     {
-        "nom": "Wrap au poulet express",
+        "nom": "Wraps poulet maison au durum",
         "cuisine": "française",
         "type": "plat",
         "temps_prep": "10 min",
         "temps_cuisson": "5 min",
+        "temps_total": "15 min",
         "nb_personnes": "2",
-        "calories": "380 kcal",
+        "calories": "370 kcal",
         "difficulte": "facile",
-        "ingredients": ["2 wraps", "200 g blanc de poulet", "1 tomate", "salade verte", "1 c.s. sauce yaourt", "sel", "poivre"],
-        "instructions": ["Faire griller le poulet 5 min à la poêle", "Couper en lamelles", "Garnir les wraps et rouler"],
+        "ingredients": ["2 wraps durum", "150 g blanc de poulet émincé", "1 tomate", "salade verte",
+                        "1 c.s. sauce yaourt à l'ail", "paprika", "sel", "poivre"],
+        "instructions": [
+            "Faire dorer le poulet émincé 5 min avec paprika, sel et poivre.",
+            "Étaler la sauce yaourt sur les wraps.",
+            "Garnir de poulet, tomate et salade. Rouler et couper en deux.",
+        ],
     },
     {
-        "nom": "Pâtes tomate mozzarella",
+        "nom": "Pâtes pesto basilic express",
         "cuisine": "italienne",
+        "type": "plat",
+        "temps_prep": "2 min",
+        "temps_cuisson": "10 min",
+        "temps_total": "12 min",
+        "nb_personnes": "2",
+        "calories": "430 kcal",
+        "difficulte": "facile",
+        "ingredients": ["200 g pâtes", "4 c.s. pesto basilic", "parmesan râpé", "sel"],
+        "instructions": [
+            "Cuire les pâtes al dente dans l'eau bouillante salée.",
+            "Égoutter en gardant 2 c.s. d'eau de cuisson.",
+            "Mélanger avec le pesto et l'eau de cuisson. Parsemer de parmesan.",
+        ],
+    },
+    {
+        "nom": "Pâtes thon tomate express",
+        "cuisine": "italienne",
+        "type": "plat",
+        "temps_prep": "3 min",
+        "temps_cuisson": "10 min",
+        "temps_total": "13 min",
+        "nb_personnes": "2",
+        "calories": "410 kcal",
+        "difficulte": "facile",
+        "ingredients": ["200 g pâtes", "1 boîte thon à l'huile", "200 g tomates pelées",
+                        "1 gousse d'ail", "persil", "huile d'olive", "sel", "poivre"],
+        "instructions": [
+            "Cuire les pâtes al dente. Faire revenir l'ail 1 min dans l'huile.",
+            "Ajouter tomates et thon, cuire 3 min.",
+            "Mélanger avec les pâtes, parsemer de persil.",
+        ],
+    },
+    {
+        "nom": "Riz sauté légumes œuf",
+        "cuisine": "française",
         "type": "plat",
         "temps_prep": "5 min",
         "temps_cuisson": "10 min",
-        "nb_personnes": "4",
-        "calories": "450 kcal",
+        "temps_total": "15 min",
+        "nb_personnes": "2",
+        "calories": "380 kcal",
         "difficulte": "facile",
-        "ingredients": ["400 g pâtes", "400 g tomates concassées", "200 g mozzarella", "basilic frais", "2 gousses d'ail", "huile d'olive", "sel", "poivre"],
-        "instructions": ["Cuire les pâtes al dente", "Faire revenir l'ail dans l'huile, ajouter les tomates 5 min", "Mélanger pâtes + sauce + mozzarella"],
+        "ingredients": ["250 g riz cuit (veille)", "2 œufs", "1 carotte râpée", "1 oignon",
+                        "sauce soja halal", "huile", "sel", "poivre"],
+        "instructions": [
+            "Faire revenir l'oignon 2 min dans l'huile, ajouter la carotte.",
+            "Ajouter le riz froid, mélanger 3 min à feu vif.",
+            "Pousser sur le côté, brouiller les œufs, mélanger. Assaisonner à la sauce soja.",
+        ],
     },
     {
-        "nom": "Salade César au poulet",
+        "nom": "Quesadillas poulet fromage",
         "cuisine": "française",
         "type": "plat",
-        "temps_prep": "10 min",
-        "temps_cuisson": "5 min",
+        "temps_prep": "5 min",
+        "temps_cuisson": "6 min",
+        "temps_total": "11 min",
         "nb_personnes": "2",
-        "calories": "320 kcal",
+        "calories": "390 kcal",
         "difficulte": "facile",
-        "ingredients": ["2 blancs de poulet", "1 laitue romaine", "parmesan râpé", "croûtons", "sauce César", "citron"],
-        "instructions": ["Griller le poulet 5 min et couper en lanières", "Mélanger la laitue, les croûtons et le parmesan", "Napper de sauce César et ajouter le poulet"],
+        "ingredients": ["4 tortillas", "150 g blanc de poulet cuit émincé",
+                        "80 g fromage râpé", "1/2 oignon", "cumin", "sel"],
+        "instructions": [
+            "Répartir poulet, fromage et oignon sur 2 tortillas. Couvrir avec les 2 autres.",
+            "Cuire 3 min de chaque côté dans une poêle chaude sans matière grasse.",
+            "Couper en triangles et servir aussitôt.",
+        ],
     },
     {
-        "nom": "Omelette provençale",
+        "nom": "Salade de pâtes thon maïs",
+        "cuisine": "française",
+        "type": "plat",
+        "temps_prep": "5 min",
+        "temps_cuisson": "10 min",
+        "temps_total": "15 min",
+        "nb_personnes": "2",
+        "calories": "350 kcal",
+        "difficulte": "facile",
+        "ingredients": ["200 g pâtes courtes", "1 boîte thon", "1 boîte maïs",
+                        "2 c.s. mayonnaise légère", "cornichons", "sel", "poivre"],
+        "instructions": [
+            "Cuire les pâtes, rincer à l'eau froide.",
+            "Mélanger avec thon, maïs, cornichons et mayonnaise.",
+            "Assaisonner et réfrigérer si possible 10 min avant service.",
+        ],
+    },
+    {
+        "nom": "Nouilles sautées légumes",
         "cuisine": "française",
         "type": "plat",
         "temps_prep": "5 min",
         "temps_cuisson": "8 min",
+        "temps_total": "13 min",
         "nb_personnes": "2",
-        "calories": "280 kcal",
-        "difficulte": "facile",
-        "ingredients": ["4 œufs", "1 tomate", "1/2 poivron", "herbes de Provence", "huile d'olive", "sel", "poivre"],
-        "instructions": ["Faire revenir poivron et tomate 3 min", "Battre les œufs avec les herbes, verser sur les légumes", "Cuire 4-5 min à feu moyen"],
-    },
-    {
-        "nom": "Riz pilaf aux épices",
-        "cuisine": "indienne",
-        "type": "plat",
-        "temps_prep": "5 min",
-        "temps_cuisson": "15 min",
-        "nb_personnes": "4",
         "calories": "360 kcal",
         "difficulte": "facile",
-        "ingredients": ["300 g riz basmati", "1 oignon", "1 c.c. curcuma", "1 c.c. cumin", "2 gousses d'ail", "bouillon de légumes", "huile", "coriandre"],
-        "instructions": ["Faire revenir oignon et épices 2 min", "Ajouter le riz et nacrer 1 min", "Couvrir de bouillon 2x volume et cuire 12 min à couvert"],
+        "ingredients": ["200 g nouilles de riz", "1 courgette", "1 carotte", "1 oignon",
+                        "2 c.s. sauce soja halal", "1 c.c. huile de sésame", "huile", "sel"],
+        "instructions": [
+            "Réhydrater les nouilles 5 min dans l'eau bouillante, égoutter.",
+            "Faire sauter les légumes émincés 5 min à feu vif.",
+            "Ajouter les nouilles, sauce soja et huile de sésame. Mélanger 2 min.",
+        ],
     },
     {
-        "nom": "Soupe de lentilles rapide",
-        "cuisine": "marocaine",
-        "type": "plat",
-        "temps_prep": "5 min",
-        "temps_cuisson": "15 min",
-        "nb_personnes": "6",
-        "calories": "290 kcal",
-        "difficulte": "facile",
-        "ingredients": ["400 g lentilles corail", "2 tomates", "1 oignon", "1 c.c. cumin", "1 c.c. curcuma", "1 c.c. paprika", "ail", "citron", "huile d'olive"],
-        "instructions": ["Faire revenir oignon et épices 2 min", "Ajouter lentilles, tomates et 1L d'eau", "Cuire 15 min, mixer partiellement, presser le citron"],
-    },
-    {
-        "nom": "Poulet citron grillé",
+        "nom": "Riz basmati poulet curry express",
         "cuisine": "française",
         "type": "plat",
         "temps_prep": "5 min",
         "temps_cuisson": "10 min",
-        "nb_personnes": "4",
-        "calories": "310 kcal",
+        "temps_total": "15 min",
+        "nb_personnes": "2",
+        "calories": "420 kcal",
         "difficulte": "facile",
-        "ingredients": ["4 blancs de poulet", "2 citrons", "3 gousses d'ail", "thym", "huile d'olive", "sel", "poivre"],
-        "instructions": ["Badigeonner le poulet d'huile, ail, thym et jus de citron", "Griller à feu vif 5 min de chaque côté", "Servir avec des quartiers de citron"],
+        "ingredients": ["250 g riz basmati cuit", "150 g blanc de poulet cuit",
+                        "100 ml crème de coco", "1 c.c. curry doux", "1 oignon", "sel"],
+        "instructions": [
+            "Faire revenir l'oignon 2 min, ajouter le poulet en dés et le curry.",
+            "Verser la crème de coco, cuire 5 min à feu moyen.",
+            "Servir sur le riz basmati chaud.",
+        ],
     },
     {
-        "nom": "Quinoa aux légumes rôtis",
+        "nom": "Pâtes beurre parmesan express",
+        "cuisine": "italienne",
+        "type": "plat",
+        "temps_prep": "1 min",
+        "temps_cuisson": "10 min",
+        "temps_total": "11 min",
+        "nb_personnes": "2",
+        "calories": "400 kcal",
+        "difficulte": "facile",
+        "ingredients": ["200 g pâtes", "30 g beurre", "50 g parmesan râpé",
+                        "poivre noir", "sel"],
+        "instructions": [
+            "Cuire les pâtes al dente, réserver 3 c.s. d'eau de cuisson.",
+            "Hors du feu, mélanger avec le beurre, l'eau de cuisson et le parmesan.",
+            "Poivrer généreusement et servir aussitôt.",
+        ],
+    },
+    {
+        "nom": "Wrap falafel salade",
         "cuisine": "française",
         "type": "plat",
-        "temps_prep": "10 min",
-        "temps_cuisson": "15 min",
-        "nb_personnes": "4",
+        "temps_prep": "5 min",
+        "temps_cuisson": "8 min",
+        "temps_total": "13 min",
+        "nb_personnes": "2",
         "calories": "340 kcal",
         "difficulte": "facile",
-        "ingredients": ["300 g quinoa", "1 courgette", "1 poivron rouge", "1 oignon rouge", "huile d'olive", "herbes de Provence", "sel", "poivre"],
-        "instructions": ["Cuire le quinoa 12 min dans l'eau bouillante salée", "Rôtir les légumes 15 min au four à 200°C avec huile et herbes", "Mélanger et assaisonner"],
-    },
-    {
-        "nom": "Taboulé au poulet",
-        "cuisine": "marocaine",
-        "type": "plat",
-        "temps_prep": "15 min",
-        "temps_cuisson": "0 min",
-        "nb_personnes": "4",
-        "calories": "350 kcal",
-        "difficulte": "facile",
-        "ingredients": ["200 g semoule fine", "200 g blanc de poulet cuit", "tomates", "concombre", "menthe fraîche", "persil", "citron", "huile d'olive", "sel"],
-        "instructions": ["Réhydrater la semoule avec de l'eau bouillante salée, laisser gonfler 5 min", "Égrainer à la fourchette avec huile et citron", "Ajouter légumes, poulet et herbes fraîches"],
-    },
-    {
-        "nom": "Dal de lentilles express",
-        "cuisine": "indienne",
-        "type": "plat",
-        "temps_prep": "5 min",
-        "temps_cuisson": "15 min",
-        "nb_personnes": "6",
-        "calories": "310 kcal",
-        "difficulte": "facile",
-        "ingredients": ["400 g lentilles corail", "400 ml lait de coco", "1 oignon", "2 gousses d'ail", "1 c.c. curcuma", "1 c.c. garam masala", "1 c.c. gingembre", "huile", "coriandre fraîche"],
-        "instructions": ["Faire revenir oignon, ail et épices 3 min", "Ajouter lentilles et lait de coco + 200 ml eau", "Cuire 12 min à feu moyen en remuant, garnir de coriandre"],
+        "ingredients": ["2 wraps", "8 falafels (surgelés)", "salade verte", "tomate",
+                        "sauce tahini", "citron", "sel"],
+        "instructions": [
+            "Cuire les falafels au four 8 min selon indication.",
+            "Préparer la sauce : tahini + jus de citron + sel + un peu d'eau.",
+            "Garnir les wraps de salade, tomate, falafels et sauce tahini.",
+        ],
     },
 ]
 
@@ -137,21 +200,16 @@ def main():
         return
 
     base_url = f"{SUPABASE_URL}/rest/v1/recettes"
-    headers_get = {
+    headers = {
         "apikey":        SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
     }
-    headers_post = {
-        **headers_get,
-        "Content-Type":  "application/json",
-        "Prefer":        "return=representation",
-    }
 
-    # Récupérer les noms existants
-    existing_names = set()
-    noms_filter = ",".join(f'"{r["nom"]}"' for r in RECETTES)
-    check_url = base_url + f"?select=nom&nom=in.({noms_filter})"
-    req_check = urllib.request.Request(check_url, headers=headers_get)
+    # Vérifier lesquels existent déjà via filtre IN sur les noms encodés
+    noms_encoded = urllib.parse.quote(",".join(f'"{r["nom"]}"' for r in RECETTES))
+    check_url = f"{base_url}?select=nom&nom=in.({noms_encoded})"
+    existing_names: set[str] = set()
+    req_check = urllib.request.Request(check_url, headers=headers)
     try:
         with urllib.request.urlopen(req_check) as resp:
             for row in json.loads(resp.read().decode()):
@@ -161,9 +219,10 @@ def main():
 
     to_insert = [r for r in RECETTES if r["nom"] not in existing_names]
     if not to_insert:
-        print(f"  Toutes les recettes express existent déjà ({len(existing_names)} trouvées).")
+        print(f"  Toutes les recettes express existent déjà ({len(existing_names)}/10).")
         return
 
+    headers_post = {**headers, "Content-Type": "application/json", "Prefer": "return=representation"}
     payload = json.dumps(to_insert).encode()
     req = urllib.request.Request(base_url, data=payload, headers=headers_post, method="POST")
     try:

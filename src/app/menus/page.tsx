@@ -74,12 +74,40 @@ const KCAL_JOUR_CIBLE = 2000
 
 // ── Configuration par slot ────────────────────────────────────────────────────
 
-function getSlotConfig(jour: string, repas: string): { maxMin: number; nbPersonnes: number } {
+// Cuisines réservées au soir + week-end uniquement
+const CUISINES_SOIR_SEULEMENT = new Set(['marocaine', 'indienne', 'afghane'])
+const CUISINES_MIDI_SEMAINE   = ['française', 'italienne']
+
+type SlotConfig = { maxMin: number; nbPersonnes: number; cuisinesOnly?: string[] }
+
+function getSlotConfig(jour: string, repas: string): SlotConfig {
   const isWeekend = JOURS_WEEKEND.has(jour)
-  if (isWeekend)           return { maxMin: 60, nbPersonnes: 6 }
+  if (isWeekend)           return { maxMin: 90, nbPersonnes: 6 }
   if (repas === 'diner')   return { maxMin: 45, nbPersonnes: 6 }
-  if (jour === 'mercredi') return { maxMin: 30, nbPersonnes: 6 }
-  return { maxMin: 30, nbPersonnes: 2 } // Lun/Mar/Jeu/Ven midi
+  // Déjeuner semaine — français/italien uniquement, rapide
+  if (jour === 'mercredi') return { maxMin: 15, nbPersonnes: 6, cuisinesOnly: CUISINES_MIDI_SEMAINE }
+  return { maxMin: 15, nbPersonnes: 2, cuisinesOnly: CUISINES_MIDI_SEMAINE }
+}
+
+// ── Temps total (prep + cuisson) ──────────────────────────────────────────────
+
+function parseMin0(temps: string | null | undefined): number {
+  if (!temps) return 0
+  const hMatch = temps.match(/(\d+)\s*h/i)
+  const mMatch = temps.match(/(\d+)\s*min/i)
+  const numOnly = temps.match(/^(\d+)$/)
+  const h = hMatch ? parseInt(hMatch[1]) : 0
+  const m = mMatch ? parseInt(mMatch[1]) : numOnly ? parseInt(numOnly[1]) : 0
+  return h * 60 + m
+}
+
+function totalMinutes(r: Recette): number {
+  if (r.temps_total) {
+    const t = parseMin0(r.temps_total)
+    if (t > 0) return t
+  }
+  const total = parseMin0(r.temps_prep) + parseMin0(r.temps_cuisson)
+  return total === 0 ? 999 : total
 }
 
 // ── Saisonnalité ──────────────────────────────────────────────────────────────
@@ -91,10 +119,10 @@ const SAISON = MOIS_ACTUEL >= 3 && MOIS_ACTUEL <= 5 ? 'printemps'
              : 'hiver'
 
 const SAISON_INGREDIENTS: Record<string, string[]> = {
-  printemps: ['asperge', 'épinard', 'petit pois', 'radis', 'artichaut', 'fève', 'laitue', 'cresson'],
-  ete:       ['tomate', 'courgette', 'aubergine', 'poivron', 'concombre', 'haricot vert', 'maïs'],
-  automne:   ['potiron', 'courge', 'champignon', 'châtaigne', 'navet', 'poireau'],
-  hiver:     ['chou', 'endive', 'poireau', 'carotte', 'panais', 'céleri', 'betterave'],
+  printemps: ['petit pois', 'épinard', 'courgette', 'fraise', 'asperge', 'radis', 'artichaut', 'fève'],
+  ete:       ['tomate', 'courgette', 'aubergine', 'poivron', 'concombre', 'melon', 'haricot vert'],
+  automne:   ['potiron', 'courge', 'champignon', 'pomme', 'poire', 'poireau', 'betterave'],
+  hiver:     ['carotte', 'orange', 'clémentine', 'céleri', 'chou', 'endive', 'panais'],
 }
 
 function estSaisonnier(r: Recette): boolean {
@@ -108,7 +136,7 @@ function estSaisonnier(r: Recette): boolean {
 // ── Astuces & variantes ───────────────────────────────────────────────────────
 
 const ASTUCES_MAP: Record<string, string[]> = {
-  marocaine: ['Dorer les épices à sec 1 min avant d\'ajouter les liquides', 'Le ras el hanout maison est bien plus parfumé', 'Une pincée de safran diluée dans l\'eau tiède révèle mieux ses arômes'],
+  marocaine: ['Dorer les épices à sec 1 min avant d\'ajouter les liquides', 'Le ras el hanout maison est bien plus parfumé', 'Diluer le safran dans l\'eau tiède 10 min avant de l\'utiliser'],
   indienne:  ['Faire revenir les épices dans l\'huile 2 min avant tout autre ingrédient', 'Le yaourt attendrit et parfume les viandes en marinade', 'Ajouter le garam masala en toute fin de cuisson'],
   italienne: ['Saler l\'eau des pâtes généreusement — elle doit avoir le goût de la mer', 'Garder une louche d\'eau de cuisson pour lier la sauce', 'Incorporer le parmesan hors du feu pour ne pas le faire grainer'],
   française: ['Déglacer la poêle avec un fond de bouillon pour récupérer les sucs', 'Un filet de citron en fin de cuisson rehausse toutes les saveurs', 'Laisser reposer la viande 5 min avant de la couper'],
@@ -116,6 +144,31 @@ const ASTUCES_MAP: Record<string, string[]> = {
   poulet:    ['Sortir le poulet du réfrigérateur 20 min avant cuisson pour une cuisson uniforme', 'Piquer la viande avant marinade pour plus de pénétration'],
   legumes:   ['Ajouter les légumes les plus durs en premier', 'Un filet de citron juste avant service préserve la couleur verte'],
   hache:     ['Travailler la viande hachée à la main avec les épices pour une meilleure texture', 'Former les boulettes avec les mains légèrement humides'],
+}
+
+const VARIANTES_MAP: Record<string, string> = {
+  marocaine: 'Remplacer la viande par des pois chiches pour une version végétarienne rapide',
+  indienne:  'Utiliser du paneer ou du tofu à la place du poulet',
+  italienne: 'Remplacer les pâtes par des courgettes spiralisées pour une version légère',
+  française: 'Adapter avec les légumes de saison disponibles dans le frigo',
+  afghane:   'Proposer en version wrap avec pain plat pour un repas express',
+  poulet:    'Remplacer par de la dinde ou du blanc de poulet pour une version plus légère',
+  legumes:   'Ajouter des lentilles corail pour enrichir en protéines sans changer le goût',
+  hache:     'Façonner en galettes et cuire à la poêle pour une version express burger',
+  poisson:   'Remplacer par du poulet si le poisson n\'est pas disponible',
+}
+
+// ── Plats lourds & limites ────────────────────────────────────────────────────
+
+const MOTS_LOURD = ['tajine', 'couscous', 'gratin', 'cassoulet', 'daube', 'pot-au-feu', 'bourguignon', 'rôti', 'lasagne']
+const MOTS_TAJINE = ['tajine', 'couscous']
+const MAX_TAJINES_WEEK = 1
+
+function estLourd(r: Recette): boolean {
+  const n = r.nom.toLowerCase()
+  if (MOTS_LOURD.some(m => n.includes(m))) return true
+  const cal = parseCalories(r.calories)
+  return cal > 0 && cal > 750
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -274,22 +327,24 @@ export default function Menus() {
 
     // Suivi hebdomadaire
     const protCountWeek: Record<string, number> = {}
-    let vegCount = 0
+    let vegCount    = 0
+    let tajineCount = 0
 
     const generated: MenuSlots = {}
 
     for (let jourIdx = 0; jourIdx < JOURS.length; jourIdx++) {
-      const jour      = JOURS[jourIdx]
+      const jour = JOURS[jourIdx]
 
       // Suivi journalier
       const proteinesDeJour = new Set<string>()
       const cuisinesDeJour  = new Set<string>()
-      let calDeJour = 0
+      let calDeJour  = 0
+      let lourdsDeJour = 0
 
       for (let repasIdx = 0; repasIdx < REPAS.length; repasIdx++) {
         const repas = REPAS[repasIdx]
         const slot  = `${jour}_${repas}` as SlotKey
-        const { maxMin } = getSlotConfig(jour, repas)
+        const { maxMin, cuisinesOnly } = getSlotConfig(jour, repas)
 
         // Slots restants dans la semaine (y compris celui-ci)
         const slotsLeft = (JOURS.length - jourIdx - 1) * REPAS.length + (REPAS.length - repasIdx)
@@ -299,32 +354,50 @@ export default function Menus() {
         // Cible calorique pour ce repas
         const calRestante = Math.max(300, KCAL_JOUR_CIBLE - calDeJour)
 
-        // Filtre strict (respecte cuisine + protéine du jour + limites semaine)
+        const passesTime = (r: Recette) => {
+          const t = totalMinutes(r)
+          return t === 999 ? (repas === 'diner' || JOURS_WEEKEND.has(jour)) : t <= maxMin
+        }
+
+        const passesCuisine = (r: Recette) =>
+          !cuisinesOnly || cuisinesOnly.includes(r.cuisine)
+
+        const passesSoirOnly = (r: Recette) =>
+          !CUISINES_SOIR_SEULEMENT.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
+
+        // Filtre strict (cuisine + protéine du jour + limites semaine + lourd)
         const filterStrict = (r: Recette) => {
           if (usedPlats.has(r.id)) return false
-          if (parseMinutes(r.temps_prep) > maxMin) return false
+          if (!passesTime(r)) return false
+          if (!passesCuisine(r)) return false
+          if (!passesSoirOnly(r)) return false
           if (cuisinesDeJour.has(r.cuisine)) return false
           const p = detecterProteine(r.nom)
           if (proteinesDeJour.has(p) && p !== 'autre') return false
           if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
           if (mustBeVeg && p !== 'legumes') return false
+          if (lourdsDeJour >= 1 && estLourd(r)) return false
+          if (tajineCount >= MAX_TAJINES_WEEK && MOTS_TAJINE.some(m => r.nom.toLowerCase().includes(m))) return false
           return true
         }
 
-        // Filtre relaxé (sans contrainte cuisine)
+        // Filtre relaxé (sans contrainte de cuisine du jour)
         const filterRelaxed = (r: Recette) => {
           if (usedPlats.has(r.id)) return false
-          if (parseMinutes(r.temps_prep) > maxMin) return false
+          if (!passesTime(r)) return false
+          if (!passesCuisine(r)) return false
+          if (!passesSoirOnly(r)) return false
           const p = detecterProteine(r.nom)
           if (proteinesDeJour.has(p) && p !== 'autre') return false
           if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
           if (mustBeVeg && p !== 'legumes') return false
+          if (lourdsDeJour >= 1 && estLourd(r)) return false
           return true
         }
 
-        // Filtre minimal (uniquement temps et utilisé, null temps_prep = acceptable)
+        // Filtre minimal — au moins pas utilisé + respect cuisine obligatoire
         const filterMin = (r: Recette) =>
-          !usedPlats.has(r.id) && (!r.temps_prep || parseMinutes(r.temps_prep) <= maxMin)
+          !usedPlats.has(r.id) && passesCuisine(r) && passesSoirOnly(r)
 
         let candidates = poolPlats.filter(filterStrict)
         if (!candidates.length) candidates = poolPlats.filter(filterRelaxed)
@@ -341,6 +414,8 @@ export default function Menus() {
         proteinesDeJour.add(prot)
         protCountWeek[prot] = (protCountWeek[prot] ?? 0) + 1
         if (prot === 'legumes') vegCount++
+        if (estLourd(plat)) lourdsDeJour++
+        if (MOTS_TAJINE.some(m => plat.nom.toLowerCase().includes(m))) tajineCount++
         calDeJour += parseCalories(plat.calories)
 
         // Entrée
@@ -397,16 +472,27 @@ export default function Menus() {
       Object.entries(slots).filter(([k]) => k !== slot).map(([, v]) => v?.plat?.id).filter(Boolean) as string[]
     )
 
+    const { cuisinesOnly } = getSlotConfig(jour, repas)
+    const passesTime = (r: Recette) => {
+      const t = totalMinutes(r)
+      return t === 999 ? (repas === 'diner' || JOURS_WEEKEND.has(jour)) : t <= maxMin
+    }
+    const passesCuisine = (r: Recette) => !cuisinesOnly || cuisinesOnly.includes(r.cuisine)
+    const passesSoirOnly = (r: Recette) =>
+      !CUISINES_SOIR_SEULEMENT.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
+
     let candidates = poolPlats.filter(r => {
       if (usedPlatIds.has(r.id)) return false
-      if (parseMinutes(r.temps_prep) > maxMin) return false
+      if (!passesTime(r)) return false
+      if (!passesCuisine(r)) return false
+      if (!passesSoirOnly(r)) return false
       const p = detecterProteine(r.nom)
       if (proteinesDeJour.has(p) && p !== 'autre') return false
       if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
       return true
     })
     if (!candidates.length)
-      candidates = poolPlats.filter(r => !usedPlatIds.has(r.id) && (!r.temps_prep || parseMinutes(r.temps_prep) <= maxMin))
+      candidates = poolPlats.filter(r => !usedPlatIds.has(r.id) && passesCuisine(r) && passesSoirOnly(r))
     if (!candidates.length) return
 
     const cs: CourseSlot = { plat: pickWeighted(candidates, protCountWeek) }
@@ -748,18 +834,29 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
               ...(ASTUCES_MAP[cuisine] ?? []).slice(0, 2),
               ...(ASTUCES_MAP[prot] && prot !== 'autre' ? ASTUCES_MAP[prot].slice(0, 1) : []),
             ].slice(0, 3)
-            if (!tips.length) return null
+            const variante = VARIANTES_MAP[cuisine] || (prot !== 'autre' ? VARIANTES_MAP[prot] : null)
+            if (!tips.length && !variante) return null
             return (
-              <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <h3 className="font-bold text-amber-800 mb-2 text-sm">💡 Astuces & variantes</h3>
-                <ul className="space-y-1.5">
-                  {tips.map((tip, i) => (
-                    <li key={i} className="text-xs text-amber-700 flex items-start gap-2">
-                      <span className="flex-shrink-0 mt-0.5">•</span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                {tips.length > 0 && (
+                  <div>
+                    <h3 className="font-bold text-amber-800 mb-2 text-sm">💡 Astuces</h3>
+                    <ul className="space-y-1.5">
+                      {tips.map((tip, i) => (
+                        <li key={i} className="text-xs text-amber-700 flex items-start gap-2">
+                          <span className="flex-shrink-0 mt-0.5">•</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {variante && (
+                  <div>
+                    <h3 className="font-bold text-amber-800 mb-1 text-sm">🔄 Variante rapide</h3>
+                    <p className="text-xs text-amber-700">{variante}</p>
+                  </div>
+                )}
               </div>
             )
           })()}
