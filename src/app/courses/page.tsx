@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { FAMILLE_ID, getMondayOfWeek, formatSemaine, JOURS, JOURS_LABELS, REPAS_LABELS, CUISINE_CONFIG, ALL_SLOTS } from '@/lib/utils'
+import { FAMILLE_ID, getMondayOfWeek, formatSemaine, JOURS, JOURS_LABELS, CUISINE_CONFIG, ALL_SLOTS } from '@/lib/utils'
 import type { Recette } from '@/lib/types'
 
 // ── Parsing ingrédients ───────────────────────────────────────────────────────
