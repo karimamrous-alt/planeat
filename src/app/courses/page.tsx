@@ -8,28 +8,61 @@ import { supabase } from '@/lib/supabase'
 import { FAMILLE_ID, getMondayOfWeek, formatSemaine, ALL_SLOTS, categoriserIngredient } from '@/lib/utils'
 import type { ArticleCourses } from '@/lib/types'
 
-type IngredientRaw = { raw?: string; nom?: string; singular?: string }
+type IngredientRaw    = { raw?: string; nom?: string; singular?: string }
 type RawgredientGroup = { ingredients?: IngredientRaw[] }
-type RecipeData = { recipeRawgredients?: RawgredientGroup[] }
+type RecipeData       = { recipeRawgredients?: RawgredientGroup[] }
 
-// Parse les ingrédients bruts (string, tableau, format 750g recipeRawgredients, etc.)
+function extraireDepuisRawgredients(parsed: RecipeData): string[] {
+  return (parsed.recipeRawgredients ?? [])
+    .flatMap((g) => g?.ingredients ?? [])
+    .map((i) => i?.raw || i?.singular || '')
+    .filter((s) => s.length > 2 && !s.includes('personne') && !s.includes('portion'))
+}
+
+function propre(s: string): boolean {
+  return s.length > 2 && !s.includes('personne') && !s.includes('portion') && !s.toLowerCase().includes('icon')
+}
+
+// Parse tous les formats d'ingrédients venant de Supabase :
+// - tableau de strings brutes (ptitchef, recettedelicuisine)
+// - tableau contenant un blob JSON 750g { recipeRawgredients: [...] }
+// - tableau d'objets { nom, raw, singular }
 function extraireIngredients(raw: unknown): string[] {
   if (!raw) return []
-  try {
-    const data: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (Array.isArray(data)) {
-      return (data as IngredientRaw[])
-        .map((item) => item?.raw || item?.nom || item?.singular || '')
-        .filter((s) => s && !s.includes('personne') && !s.includes('portion') && s.length > 2)
+
+  const data: unknown = typeof raw === 'string' ? (() => { try { return JSON.parse(raw) } catch { return raw } })() : raw
+
+  const results: string[] = []
+
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (typeof item === 'string') {
+        const t = item.trim()
+        if (t.startsWith('{')) {
+          // Blob JSON embarqué (format 750g)
+          try {
+            const parsed = JSON.parse(t) as RecipeData
+            if (parsed.recipeRawgredients) {
+              results.push(...extraireDepuisRawgredients(parsed))
+            }
+          } catch { /* blob malformé, ignorer */ }
+        } else if (propre(t)) {
+          results.push(t)
+        }
+      } else if (item && typeof item === 'object') {
+        const o = item as IngredientRaw
+        const val = o.raw || o.nom || o.singular || ''
+        if (propre(val)) results.push(val)
+      }
     }
-    if ((data as RecipeData)?.recipeRawgredients) {
-      return ((data as RecipeData).recipeRawgredients ?? [])
-        .flatMap((g) => g?.ingredients ?? [])
-        .map((i) => i?.raw || i?.singular || '')
-        .filter((s) => s && !s.includes('personne') && s.length > 2)
-    }
-  } catch { /* ignore */ }
-  return typeof raw === 'string' ? [raw] : []
+  } else if (data && typeof data === 'object' && (data as RecipeData).recipeRawgredients) {
+    results.push(...extraireDepuisRawgredients(data as RecipeData))
+  }
+
+  const uniques = [...new Set(results)]
+  if (uniques.length === 0) console.log('[extraireIngredients] aucun ingrédient extrait, raw =', raw)
+  else console.log('[extraireIngredients]', uniques.length, 'ingrédients :', uniques.slice(0, 3))
+  return uniques
 }
 
 // Extrait les IDs recette d'une valeur de slot (UUID simple ou JSON multi-cours)
