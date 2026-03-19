@@ -5,8 +5,29 @@ export const runtime = 'edge'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { FAMILLE_ID, getMondayOfWeek, formatSemaine, ALL_SLOTS, consolidateIngredients } from '@/lib/utils'
+import { FAMILLE_ID, getMondayOfWeek, formatSemaine, ALL_SLOTS, categoriserIngredient } from '@/lib/utils'
 import type { ArticleCourses } from '@/lib/types'
+
+// Parse les ingrédients bruts (string, tableau, format 750g recipeRawgredients, etc.)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extraireIngredients(raw: any): string[] {
+  if (!raw) return []
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (Array.isArray(data)) {
+      return data
+        .map((item: any) => item?.raw || item?.nom || item?.singular || '')
+        .filter((s: string) => s && !s.includes('personne') && !s.includes('portion') && s.length > 2)
+    }
+    if (data?.recipeRawgredients) {
+      return data.recipeRawgredients
+        .flatMap((g: any) => g?.ingredients || [])
+        .map((i: any) => i?.raw || i?.singular || '')
+        .filter((s: string) => s && !s.includes('personne') && s.length > 2)
+    }
+  } catch { /* ignore */ }
+  return typeof raw === 'string' ? [raw] : []
+}
 
 // Extrait les IDs recette d'une valeur de slot (UUID simple ou JSON multi-cours)
 function slotIds(val: unknown): string[] {
@@ -55,7 +76,16 @@ export default function ListeDeCourses() {
         ? await supabase.from('recettes').select('*').in('id', ids)
         : { data: [] }
 
-      const consolidated = consolidateIngredients(recs ?? [])
+      const seen = new Map<string, ArticleCourses>()
+      for (const rec of (recs ?? [])) {
+        for (const nom of extraireIngredients(rec.ingredients)) {
+          const key = nom.toLowerCase().replace(/\s+/g, ' ')
+          if (!seen.has(key)) {
+            seen.set(key, { nom: nom.trim(), quantite: '', unite: '', categorie: categoriserIngredient(nom), coche: false })
+          }
+        }
+      }
+      const consolidated = Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
 
       const { data: nouvelle } = await supabase.from('liste_courses')
         .insert({ menu_id: menu.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] })
