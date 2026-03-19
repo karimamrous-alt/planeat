@@ -1,12 +1,15 @@
 export const runtime = 'edge'
 
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import Navigation from '@/components/Navigation'
 import { VERSION, VERSION_DATE } from '@/lib/version'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = localFont({
+  src: './fonts/GeistVF.woff',
+  variable: '--font-geist',
+})
 
 export const metadata: Metadata = {
   title: 'PlanEat - Planification des repas en famille',
