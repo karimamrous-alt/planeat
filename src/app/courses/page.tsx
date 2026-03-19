@@ -2,11 +2,13 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { FAMILLE_ID, getMondayOfWeek, formatSemaine, ALL_SLOTS, categoriserIngredient } from '@/lib/utils'
-import type { ArticleCourses } from '@/lib/types'
+import { FAMILLE_ID, getMondayOfWeek, formatSemaine, JOURS, JOURS_LABELS, REPAS_LABELS, CUISINE_CONFIG, ALL_SLOTS } from '@/lib/utils'
+import type { Recette } from '@/lib/types'
+
+// ── Parsing ingrédients ───────────────────────────────────────────────────────
 
 type IngredientRaw    = { raw?: string; nom?: string; singular?: string }
 type RawgredientGroup = { ingredients?: IngredientRaw[] }
@@ -23,29 +25,21 @@ function propre(s: string): boolean {
   return s.length > 2 && !s.includes('personne') && !s.includes('portion') && !s.toLowerCase().includes('icon')
 }
 
-// Parse tous les formats d'ingrédients venant de Supabase :
-// - tableau de strings brutes (ptitchef, recettedelicuisine)
-// - tableau contenant un blob JSON 750g { recipeRawgredients: [...] }
-// - tableau d'objets { nom, raw, singular }
 function extraireIngredients(raw: unknown): string[] {
   if (!raw) return []
-
-  const data: unknown = typeof raw === 'string' ? (() => { try { return JSON.parse(raw) } catch { return raw } })() : raw
-
+  const data: unknown = typeof raw === 'string'
+    ? (() => { try { return JSON.parse(raw) } catch { return raw } })()
+    : raw
   const results: string[] = []
-
   if (Array.isArray(data)) {
     for (const item of data) {
       if (typeof item === 'string') {
         const t = item.trim()
         if (t.startsWith('{')) {
-          // Blob JSON embarqué (format 750g)
           try {
             const parsed = JSON.parse(t) as RecipeData
-            if (parsed.recipeRawgredients) {
-              results.push(...extraireDepuisRawgredients(parsed))
-            }
-          } catch { /* blob malformé, ignorer */ }
+            if (parsed.recipeRawgredients) results.push(...extraireDepuisRawgredients(parsed))
+          } catch { /* blob malformé */ }
         } else if (propre(t)) {
           results.push(t)
         }
@@ -58,14 +52,11 @@ function extraireIngredients(raw: unknown): string[] {
   } else if (data && typeof data === 'object' && (data as RecipeData).recipeRawgredients) {
     results.push(...extraireDepuisRawgredients(data as RecipeData))
   }
-
-  const uniques = [...new Set(results)]
-  if (uniques.length === 0) console.log('[extraireIngredients] aucun ingrédient extrait, raw =', raw)
-  else console.log('[extraireIngredients]', uniques.length, 'ingrédients :', uniques.slice(0, 3))
-  return uniques
+  return [...new Set(results)]
 }
 
-// Extrait les IDs recette d'une valeur de slot (UUID simple ou JSON multi-cours)
+// ── Helpers slots ─────────────────────────────────────────────────────────────
+
 function slotIds(val: unknown): string[] {
   if (typeof val !== 'string' || !val) return []
   if (val.startsWith('{')) {
@@ -75,20 +66,117 @@ function slotIds(val: unknown): string[] {
   return [val]
 }
 
-interface ListeCourses {
-  id: string
-  ingredients_consolides: ArticleCourses[]
-  articles_manuels: ArticleCourses[]
-  menu_id: string | null
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface SlotInfo { jour: string; repas: string }
+interface RecetteCard { recette: Recette; slots: SlotInfo[]; ingredients: string[] }
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function Modal({ card, onClose }: { card: RecetteCard; onClose: () => void }) {
+  const { recette, slots, ingredients } = card
+  const cfg = CUISINE_CONFIG[recette.cuisine] ?? { emoji: '🍴', colorClass: 'text-gray-600', bgClass: 'bg-gray-50 border-gray-200' }
+
+  const texte = `🛒 ${recette.nom}\n\nIngrédients :\n${ingredients.map(i => `• ${i}`).join('\n')}`
+  const encoded = encodeURIComponent(texte)
+
+  const imprimer = () => {
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${recette.nom}</title>
+      <style>body{font-family:sans-serif;padding:2rem;max-width:500px}h2{margin-bottom:.5rem}
+      ul{padding-left:1.2rem}li{margin:.25rem 0}p{color:#666;font-size:.9rem;margin-bottom:1rem}</style>
+      </head><body>
+      <h2>🛒 ${recette.nom}</h2>
+      <p>${cfg.emoji} ${recette.cuisine}${slots.map(s => ` · ${JOURS_LABELS[s.jour]} ${s.repas === 'dejeuner' ? 'Déjeuner' : 'Dîner'}`).join('')}</p>
+      <ul>${ingredients.map(i => `<li>${i}</li>`).join('')}</ul>
+      </body></html>`)
+    w.document.close()
+    w.print()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={`p-5 rounded-t-3xl sm:rounded-t-2xl border-b ${cfg.bgClass}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className={`text-xs font-semibold mb-1 ${cfg.colorClass}`}>{cfg.emoji} {recette.cuisine}</p>
+              <h2 className="font-bold text-gray-800 text-lg leading-tight">{recette.nom}</h2>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {slots.map((s, i) => (
+                  <span key={i} className="text-xs bg-white/70 border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
+                    {JOURS_LABELS[s.jour]} · {s.repas === 'dejeuner' ? '🌞 Déj.' : '🌙 Dîner'}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0">✕</button>
+          </div>
+        </div>
+
+        {/* Ingrédients */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {ingredients.length > 0 ? (
+            <ul className="space-y-2">
+              {ingredients.map((ing, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-green-500 mt-0.5 flex-shrink-0">•</span>
+                  <span>{ing}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-400 text-sm text-center py-4">Aucun ingrédient disponible.</p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="p-4 border-t border-gray-100 grid grid-cols-3 gap-2">
+          <a
+            href={`https://wa.me/?text=${encoded}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1 bg-green-50 hover:bg-green-100 border border-green-200 rounded-xl py-3 px-2 transition-colors"
+          >
+            <span className="text-xl">📱</span>
+            <span className="text-xs font-medium text-green-700 text-center leading-tight">WhatsApp</span>
+          </a>
+          <a
+            href={`sms:?body=${encoded}`}
+            className="flex flex-col items-center gap-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl py-3 px-2 transition-colors"
+          >
+            <span className="text-xl">💬</span>
+            <span className="text-xs font-medium text-blue-700 text-center leading-tight">SMS</span>
+          </a>
+          <button
+            onClick={imprimer}
+            className="flex flex-col items-center gap-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl py-3 px-2 transition-colors"
+          >
+            <span className="text-xl">🖨️</span>
+            <span className="text-xs font-medium text-gray-600 text-center leading-tight">Imprimer</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
+
+// ── Page principale ───────────────────────────────────────────────────────────
 
 export default function ListeDeCourses() {
   const semaine = getMondayOfWeek()
-  const [liste, setListe]     = useState<ListeCourses | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [hasMenu, setHasMenu] = useState(false)
-  const [saving, setSaving]   = useState(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [cards, setCards]       = useState<RecetteCard[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [hasMenu, setHasMenu]   = useState(false)
+  const [selected, setSelected] = useState<RecetteCard | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -101,113 +189,42 @@ export default function ListeDeCourses() {
       if (!menu) { setHasMenu(false); setLoading(false); return }
       setHasMenu(true)
 
-      const { data: existante } = await supabase
-        .from('liste_courses').select('*').eq('menu_id', menu.id).maybeSingle()
-
-      if (existante) { setListe(existante); setLoading(false); return }
-
-      // Créer depuis les recettes du menu (gère les slots multi-cours)
-      const ids = [...new Set(ALL_SLOTS.flatMap(s => slotIds((menu as Record<string, unknown>)[s])))]
-      const { data: recs } = ids.length
-        ? await supabase.from('recettes').select('*').in('id', ids)
-        : { data: [] }
-
-      const seen = new Map<string, ArticleCourses>()
-      for (const rec of (recs ?? [])) {
-        for (const nom of extraireIngredients(rec.ingredients)) {
-          const key = nom.toLowerCase().replace(/\s+/g, ' ')
-          if (!seen.has(key)) {
-            seen.set(key, { nom: nom.trim(), quantite: '', unite: '', categorie: categoriserIngredient(nom), coche: false })
-          }
+      // Collecter les IDs par slot avec info jour/repas
+      const slotMap = new Map<string, SlotInfo[]>()
+      for (const slot of ALL_SLOTS) {
+        const [jour, repas] = slot.split('_')
+        for (const id of slotIds((menu as Record<string, unknown>)[slot])) {
+          if (!slotMap.has(id)) slotMap.set(id, [])
+          slotMap.get(id)!.push({ jour, repas })
         }
       }
-      const consolidated = Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
 
-      const { data: nouvelle } = await supabase.from('liste_courses')
-        .insert({ menu_id: menu.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] })
-        .select('*').single()
+      const ids = [...slotMap.keys()]
+      if (!ids.length) { setCards([]); setLoading(false); return }
 
-      setListe(nouvelle)
+      const { data: recs } = await supabase.from('recettes').select('*').in('id', ids)
+
+      const result: RecetteCard[] = (recs ?? []).map((rec: Recette) => ({
+        recette: rec,
+        slots: slotMap.get(rec.id) ?? [],
+        ingredients: extraireIngredients(rec.ingredients),
+      }))
+
+      // Trier par jour/repas du premier slot
+      const jourIdx = Object.fromEntries(JOURS.map((j, i) => [j, i]))
+      result.sort((a, b) => {
+        const sa = a.slots[0] ?? { jour: 'lundi', repas: 'dejeuner' }
+        const sb = b.slots[0] ?? { jour: 'lundi', repas: 'dejeuner' }
+        const diff = (jourIdx[sa.jour] ?? 0) - (jourIdx[sb.jour] ?? 0)
+        if (diff !== 0) return diff
+        return sa.repas === 'dejeuner' ? -1 : 1
+      })
+
+      setCards(result)
       setLoading(false)
     }
     load()
   }, [semaine])
-
-  const sauvegarder = useCallback((updated: ListeCourses) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    setSaving(true)
-    saveTimer.current = setTimeout(async () => {
-      await supabase.from('liste_courses').update({
-        ingredients_consolides: updated.ingredients_consolides,
-        articles_manuels: updated.articles_manuels,
-      }).eq('id', updated.id)
-      setSaving(false)
-    }, 400)
-  }, [])
-
-  const toggleCoche = (nom: string) => {
-    if (!liste) return
-    // Chercher dans consolidated d'abord, sinon manuels
-    const inConsolidated = liste.ingredients_consolides.some(a => a.nom === nom)
-    const field = inConsolidated ? 'ingredients_consolides' : 'articles_manuels'
-    const updated: ListeCourses = {
-      ...liste,
-      [field]: liste[field].map(a => a.nom === nom ? { ...a, coche: !a.coche } : a),
-    }
-    setListe(updated)
-    sauvegarder(updated)
-  }
-
-  const supprimerCoches = () => {
-    if (!liste) return
-    const updated: ListeCourses = {
-      ...liste,
-      ingredients_consolides: liste.ingredients_consolides.filter(a => !a.coche),
-      articles_manuels: liste.articles_manuels.filter(a => !a.coche),
-    }
-    setListe(updated)
-    sauvegarder(updated)
-  }
-
-  const regenerer = async () => {
-    if (!liste) return
-    setLoading(true)
-    await supabase.from('liste_courses').delete().eq('id', liste.id)
-    setListe(null)
-    // Recharger depuis zéro — le useEffect ne se redéclenche pas, on recharge manuellement
-    const { data: menu } = await supabase
-      .from('menus').select('*')
-      .eq('famille_id', FAMILLE_ID).eq('semaine', semaine).maybeSingle()
-    if (!menu) { setLoading(false); return }
-    const ids = [...new Set(ALL_SLOTS.flatMap(s => slotIds((menu as Record<string, unknown>)[s])))]
-    const { data: recs } = ids.length
-      ? await supabase.from('recettes').select('*').in('id', ids)
-      : { data: [] }
-    const seen = new Map<string, ArticleCourses>()
-    for (const rec of (recs ?? [])) {
-      for (const nom of extraireIngredients(rec.ingredients)) {
-        const key = nom.toLowerCase().replace(/\s+/g, ' ')
-        if (!seen.has(key)) {
-          seen.set(key, { nom: nom.trim(), quantite: '', unite: '', categorie: categoriserIngredient(nom), coche: false })
-        }
-      }
-    }
-    const consolidated = Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
-    const { data: nouvelle } = await supabase.from('liste_courses')
-      .insert({ menu_id: menu.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] })
-      .select('*').single()
-    setListe(nouvelle)
-    setLoading(false)
-  }
-
-  // Fusionner et trier alphabétiquement
-  const articles = liste
-    ? [...liste.ingredients_consolides, ...liste.articles_manuels]
-        .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
-    : []
-
-  const nbCoches = articles.filter(a => a.coche).length
-  const pct = articles.length > 0 ? Math.round((nbCoches / articles.length) * 100) : 0
 
   if (loading) return (
     <div className="flex items-center justify-center h-48"><div className="spinner text-green-700" /></div>
@@ -227,79 +244,51 @@ export default function ListeDeCourses() {
   return (
     <div className="fade-in space-y-6">
       {/* En-tête */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">🛒 Liste de courses</h1>
-          <p className="text-gray-500 text-sm">Semaine du {formatSemaine(semaine)}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saving && (
-            <span className="text-xs text-gray-400 flex items-center gap-1">
-              <span className="spinner text-gray-400" style={{ width: '0.9rem', height: '0.9rem' }} />
-              Sauvegarde...
-            </span>
-          )}
-          {liste && (
-            <button
-              onClick={regenerer}
-              className="text-xs text-gray-400 hover:text-orange-500 transition-colors"
-              title="Supprimer la liste en base et la recréer depuis les recettes du menu"
-            >
-              🔄 Régénérer
-            </button>
-          )}
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">🛒 Liste de courses</h1>
+        <p className="text-gray-500 text-sm">Semaine du {formatSemaine(semaine)} · {cards.length} recette{cards.length > 1 ? 's' : ''}</p>
       </div>
 
-      {/* Progression */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-600">{nbCoches} / {articles.length} articles cochés</span>
-          <span className="text-sm font-bold text-green-700">{pct} %</span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-3">
-          <div className="bg-green-500 h-3 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-        </div>
-        {pct === 100 && articles.length > 0 && (
-          <p className="text-green-600 text-sm font-medium mt-2 text-center">🎉 Tous les articles cochés !</p>
-        )}
-      </div>
+      <p className="text-sm text-gray-400">Appuyez sur une recette pour voir ses ingrédients et les partager.</p>
 
-      {/* Liste alphabétique */}
-      {articles.length > 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <ul className="divide-y divide-gray-50">
-            {articles.map(article => (
-              <li
-                key={article.nom}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => toggleCoche(article.nom)}
+      {/* Grille de cartes */}
+      {cards.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {cards.map((card) => {
+            const cfg = CUISINE_CONFIG[card.recette.cuisine] ?? { emoji: '🍴', colorClass: 'text-gray-600', bgClass: 'bg-gray-50 border-gray-200' }
+            return (
+              <button
+                key={card.recette.id}
+                onClick={() => setSelected(card)}
+                className={`text-left rounded-2xl border p-4 transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99] ${cfg.bgClass}`}
               >
-                <input
-                  type="checkbox"
-                  checked={article.coche}
-                  onChange={() => toggleCoche(article.nom)}
-                  onClick={e => e.stopPropagation()}
-                  className="w-4 h-4 accent-green-600 cursor-pointer flex-shrink-0 rounded"
-                />
-                <span className={`flex-1 text-sm ${article.coche ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                  {[article.quantite, article.unite, article.nom].filter(Boolean).join(' ')}
-                </span>
-              </li>
-            ))}
-          </ul>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-semibold mb-1 ${cfg.colorClass}`}>{cfg.emoji} {card.recette.cuisine}</p>
+                    <p className="font-bold text-gray-800 text-sm leading-snug truncate">{card.recette.nom}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {card.slots.map((s, i) => (
+                        <span key={i} className="text-xs bg-white/60 border border-gray-200 rounded-full px-2 py-0.5 text-gray-500">
+                          {JOURS_LABELS[s.jour]} · {s.repas === 'dejeuner' ? '🌞' : '🌙'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-gray-300 text-lg flex-shrink-0">›</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">{card.ingredients.length} ingrédient{card.ingredients.length > 1 ? 's' : ''}</p>
+              </button>
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-10 bg-white rounded-2xl border border-gray-200">
-          <p className="text-gray-400 text-sm">Aucun ingrédient dans la liste.</p>
+          <p className="text-gray-400 text-sm">Aucune recette dans le menu.</p>
         </div>
       )}
 
-      {nbCoches > 0 && (
-        <button onClick={supprimerCoches} className="text-sm text-red-400 hover:text-red-600 transition-colors">
-          Supprimer les articles cochés ({nbCoches})
-        </button>
-      )}
+      {/* Modal */}
+      {selected && <Modal card={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
