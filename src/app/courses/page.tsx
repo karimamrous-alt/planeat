@@ -169,6 +169,37 @@ export default function ListeDeCourses() {
     sauvegarder(updated)
   }
 
+  const regenerer = async () => {
+    if (!liste) return
+    setLoading(true)
+    await supabase.from('liste_courses').delete().eq('id', liste.id)
+    setListe(null)
+    // Recharger depuis zéro — le useEffect ne se redéclenche pas, on recharge manuellement
+    const { data: menu } = await supabase
+      .from('menus').select('*')
+      .eq('famille_id', FAMILLE_ID).eq('semaine', semaine).maybeSingle()
+    if (!menu) { setLoading(false); return }
+    const ids = [...new Set(ALL_SLOTS.flatMap(s => slotIds((menu as Record<string, unknown>)[s])))]
+    const { data: recs } = ids.length
+      ? await supabase.from('recettes').select('*').in('id', ids)
+      : { data: [] }
+    const seen = new Map<string, ArticleCourses>()
+    for (const rec of (recs ?? [])) {
+      for (const nom of extraireIngredients(rec.ingredients)) {
+        const key = nom.toLowerCase().replace(/\s+/g, ' ')
+        if (!seen.has(key)) {
+          seen.set(key, { nom: nom.trim(), quantite: '', unite: '', categorie: categoriserIngredient(nom), coche: false })
+        }
+      }
+    }
+    const consolidated = Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
+    const { data: nouvelle } = await supabase.from('liste_courses')
+      .insert({ menu_id: menu.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] })
+      .select('*').single()
+    setListe(nouvelle)
+    setLoading(false)
+  }
+
   // Fusionner et trier alphabétiquement
   const articles = liste
     ? [...liste.ingredients_consolides, ...liste.articles_manuels]
@@ -201,12 +232,23 @@ export default function ListeDeCourses() {
           <h1 className="text-2xl font-bold text-gray-800">🛒 Liste de courses</h1>
           <p className="text-gray-500 text-sm">Semaine du {formatSemaine(semaine)}</p>
         </div>
-        {saving && (
-          <span className="text-xs text-gray-400 flex items-center gap-1">
-            <span className="spinner text-gray-400" style={{ width: '0.9rem', height: '0.9rem' }} />
-            Sauvegarde...
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {saving && (
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <span className="spinner text-gray-400" style={{ width: '0.9rem', height: '0.9rem' }} />
+              Sauvegarde...
+            </span>
+          )}
+          {liste && (
+            <button
+              onClick={regenerer}
+              className="text-xs text-gray-400 hover:text-orange-500 transition-colors"
+              title="Supprimer la liste en base et la recréer depuis les recettes du menu"
+            >
+              🔄 Régénérer
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progression */}
