@@ -154,27 +154,6 @@ export default function Accueil() {
         )}
       </section>
 
-      {/* Accès rapide */}
-      <section>
-        <h2 className="font-bold text-gray-700 mb-4">Accès rapide</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { href: '/menus',   emoji: '📅', title: 'Génération de menus',  desc: `Planifiez vos ${nbRepasPlannifies > 0 ? nbRepasPlannifies + ' repas déjà planifiés' : 'repas de la semaine'}`, color: 'border-green-200 hover:bg-green-50' },
-            { href: '/courses', emoji: '🛒', title: 'Liste de courses',     desc: 'Votre liste générée automatiquement', color: 'border-orange-200 hover:bg-orange-50' },
-            { href: '/favoris', emoji: '❤️', title: 'Plats favoris',        desc: `${nbFavoris} recette${nbFavoris > 1 ? 's' : ''} sauvegardée${nbFavoris > 1 ? 's' : ''}`, color: 'border-red-200 hover:bg-red-50' },
-            { href: '/profil',  emoji: '👨‍👩‍👧‍👦', title: 'Profil famille',     desc: `${famille?.nb_personnes ?? 6} membres · Régime ${famille?.regime ?? 'halal'}`, color: 'border-blue-200 hover:bg-blue-50' },
-          ].map(c => (
-            <Link key={c.href} href={c.href} className={`flex items-start gap-4 bg-white rounded-2xl border p-5 transition-colors ${c.color}`}>
-              <span className="text-3xl">{c.emoji}</span>
-              <div>
-                <p className="font-bold text-gray-800">{c.title}</p>
-                <p className="text-sm text-gray-500 mt-0.5">{c.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* Cuisines disponibles */}
       <section className="bg-white rounded-2xl border border-gray-200 p-6">
         <h2 className="font-bold text-gray-800 mb-4">Cuisines disponibles</h2>

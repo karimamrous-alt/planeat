@@ -72,6 +72,52 @@ const MIN_VEG_WEEK = 2
 // Cible calorique journalière pour 6 personnes
 const KCAL_JOUR_CIBLE = 2000
 
+// ── Configuration par slot ────────────────────────────────────────────────────
+
+function getSlotConfig(jour: string, repas: string): { maxMin: number; nbPersonnes: number } {
+  const isWeekend = JOURS_WEEKEND.has(jour)
+  if (isWeekend)           return { maxMin: 60, nbPersonnes: 6 }
+  if (repas === 'diner')   return { maxMin: 45, nbPersonnes: 6 }
+  if (jour === 'mercredi') return { maxMin: 30, nbPersonnes: 6 }
+  return { maxMin: 30, nbPersonnes: 2 } // Lun/Mar/Jeu/Ven midi
+}
+
+// ── Saisonnalité ──────────────────────────────────────────────────────────────
+
+const MOIS_ACTUEL = new Date().getMonth() + 1 // 1-12
+const SAISON = MOIS_ACTUEL >= 3 && MOIS_ACTUEL <= 5 ? 'printemps'
+             : MOIS_ACTUEL >= 6 && MOIS_ACTUEL <= 8 ? 'ete'
+             : MOIS_ACTUEL >= 9 && MOIS_ACTUEL <= 11 ? 'automne'
+             : 'hiver'
+
+const SAISON_INGREDIENTS: Record<string, string[]> = {
+  printemps: ['asperge', 'épinard', 'petit pois', 'radis', 'artichaut', 'fève', 'laitue', 'cresson'],
+  ete:       ['tomate', 'courgette', 'aubergine', 'poivron', 'concombre', 'haricot vert', 'maïs'],
+  automne:   ['potiron', 'courge', 'champignon', 'châtaigne', 'navet', 'poireau'],
+  hiver:     ['chou', 'endive', 'poireau', 'carotte', 'panais', 'céleri', 'betterave'],
+}
+
+function estSaisonnier(r: Recette): boolean {
+  const ings = SAISON_INGREDIENTS[SAISON] ?? []
+  const ingStr = (Array.isArray(r.ingredients) ? r.ingredients : [])
+    .map(i => typeof i === 'string' ? i : (i as { nom?: string }).nom ?? '')
+    .join(' ').toLowerCase()
+  return ings.some(s => ingStr.includes(s) || r.nom.toLowerCase().includes(s))
+}
+
+// ── Astuces & variantes ───────────────────────────────────────────────────────
+
+const ASTUCES_MAP: Record<string, string[]> = {
+  marocaine: ['Dorer les épices à sec 1 min avant d\'ajouter les liquides', 'Le ras el hanout maison est bien plus parfumé', 'Une pincée de safran diluée dans l\'eau tiède révèle mieux ses arômes'],
+  indienne:  ['Faire revenir les épices dans l\'huile 2 min avant tout autre ingrédient', 'Le yaourt attendrit et parfume les viandes en marinade', 'Ajouter le garam masala en toute fin de cuisson'],
+  italienne: ['Saler l\'eau des pâtes généreusement — elle doit avoir le goût de la mer', 'Garder une louche d\'eau de cuisson pour lier la sauce', 'Incorporer le parmesan hors du feu pour ne pas le faire grainer'],
+  française: ['Déglacer la poêle avec un fond de bouillon pour récupérer les sucs', 'Un filet de citron en fin de cuisson rehausse toutes les saveurs', 'Laisser reposer la viande 5 min avant de la couper'],
+  afghane:   ['Les épices afghanes gagnent à être grillées à sec avant d\'être moulues', 'La coriandre fraîche se met toujours en toute fin de cuisson'],
+  poulet:    ['Sortir le poulet du réfrigérateur 20 min avant cuisson pour une cuisson uniforme', 'Piquer la viande avant marinade pour plus de pénétration'],
+  legumes:   ['Ajouter les légumes les plus durs en premier', 'Un filet de citron juste avant service préserve la couleur verte'],
+  hache:     ['Travailler la viande hachée à la main avec les épices pour une meilleure texture', 'Former les boulettes avec les mains légèrement humides'],
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function recetteEstValide(r: Recette): boolean {
@@ -105,6 +151,7 @@ function pickWeighted(
   protCountWeek: Record<string, number>,
   vegBoost = false,
   targetCal = 0,
+  saisonnierBoost = true,
 ): Recette {
   const scored = candidates.map(r => {
     const prot     = detecterProteine(r.nom)
@@ -115,7 +162,8 @@ function pickWeighted(
       const cal = parseCalories(r.calories)
       if (cal > 0) calScore = Math.max(0, 0.15 - Math.abs(cal - targetCal) / 2000)
     }
-    return { r, score: Math.random() * 0.5 + protScore * 0.3 + vegScore + calScore }
+    const saisonScore = saisonnierBoost && estSaisonnier(r) ? 0.15 : 0
+    return { r, score: Math.random() * 0.5 + protScore * 0.3 + vegScore + calScore + saisonScore }
   })
   scored.sort((a, b) => b.score - a.score)
   return scored[0].r
@@ -232,8 +280,6 @@ export default function Menus() {
 
     for (let jourIdx = 0; jourIdx < JOURS.length; jourIdx++) {
       const jour      = JOURS[jourIdx]
-      const isWeekend = JOURS_WEEKEND.has(jour)
-      const maxMin    = isWeekend ? 9999 : 45
 
       // Suivi journalier
       const proteinesDeJour = new Set<string>()
@@ -243,6 +289,7 @@ export default function Menus() {
       for (let repasIdx = 0; repasIdx < REPAS.length; repasIdx++) {
         const repas = REPAS[repasIdx]
         const slot  = `${jour}_${repas}` as SlotKey
+        const { maxMin } = getSlotConfig(jour, repas)
 
         // Slots restants dans la semaine (y compris celui-ci)
         const slotsLeft = (JOURS.length - jourIdx - 1) * REPAS.length + (REPAS.length - repasIdx)
@@ -275,9 +322,9 @@ export default function Menus() {
           return true
         }
 
-        // Filtre minimal (uniquement temps et utilisé)
+        // Filtre minimal (uniquement temps et utilisé, null temps_prep = acceptable)
         const filterMin = (r: Recette) =>
-          !usedPlats.has(r.id) && parseMinutes(r.temps_prep) <= maxMin
+          !usedPlats.has(r.id) && (!r.temps_prep || parseMinutes(r.temps_prep) <= maxMin)
 
         let candidates = poolPlats.filter(filterStrict)
         if (!candidates.length) candidates = poolPlats.filter(filterRelaxed)
@@ -325,8 +372,8 @@ export default function Menus() {
   // ── Régénérer un slot ──────────────────────────────────────────────────────
   const regenererSlot = (slot: SlotKey) => {
     if (!poolPlats.length) return
-    const [jour] = slot.split('_')
-    const maxMin       = JOURS_WEEKEND.has(jour) ? 9999 : 45
+    const [jour, repas] = slot.split('_')
+    const { maxMin } = getSlotConfig(jour, repas)
     const needsEntree  = structure === 'entree_plat'  || structure === 'entree_plat_dessert'
     const needsDessert = structure === 'plat_dessert' || structure === 'entree_plat_dessert'
 
@@ -359,7 +406,7 @@ export default function Menus() {
       return true
     })
     if (!candidates.length)
-      candidates = poolPlats.filter(r => !usedPlatIds.has(r.id) && parseMinutes(r.temps_prep) <= maxMin)
+      candidates = poolPlats.filter(r => !usedPlatIds.has(r.id) && (!r.temps_prep || parseMinutes(r.temps_prep) <= maxMin))
     if (!candidates.length) return
 
     const cs: CourseSlot = { plat: pickWeighted(candidates, protCountWeek) }
@@ -473,12 +520,22 @@ export default function Menus() {
           <div className="min-w-[640px]">
             <div className="grid grid-cols-8 gap-2 mb-2">
               <div className="col-span-1" />
-              {JOURS.map(jour => (
-                <div key={jour} className={`col-span-1 text-center text-xs font-bold uppercase tracking-wide py-2 ${JOURS_WEEKEND.has(jour) ? 'text-orange-500' : 'text-gray-600'}`}>
-                  {JOURS_LABELS[jour].slice(0, 3)}
-                  {JOURS_WEEKEND.has(jour) && <span className="block text-orange-300 text-[9px] normal-case tracking-normal">week-end</span>}
-                </div>
-              ))}
+              {JOURS.map(jour => {
+                const calJour = REPAS.reduce((sum, r) => {
+                  const cs = slots[`${jour}_${r}` as SlotKey]
+                  return sum + (cs?.plat ? parseCalories(cs.plat.calories) : 0)
+                }, 0)
+                const calDot = calJour === 0 ? null : calJour < 800 ? '🟢' : calJour < 1600 ? '🟠' : '🔴'
+                return (
+                  <div key={jour} className={`col-span-1 text-center text-xs font-bold uppercase tracking-wide py-2 ${JOURS_WEEKEND.has(jour) ? 'text-orange-500' : 'text-gray-600'}`}>
+                    {JOURS_LABELS[jour].slice(0, 3)}
+                    {calDot
+                      ? <span className="block text-[9px] normal-case tracking-normal font-normal">{calDot} {calJour} kcal</span>
+                      : JOURS_WEEKEND.has(jour) && <span className="block text-orange-300 text-[9px] normal-case tracking-normal">week-end</span>
+                    }
+                  </div>
+                )
+              })}
             </div>
 
             {REPAS.map(repas => (
@@ -489,6 +546,7 @@ export default function Menus() {
                 {JOURS.map(jour => {
                   const slot = `${jour}_${repas}` as SlotKey
                   const cs   = slots[slot]
+                  const { nbPersonnes } = getSlotConfig(jour, repas)
                   return (
                     <div key={slot} className="col-span-1">
                       {cs ? (
@@ -510,11 +568,12 @@ export default function Menus() {
                             const cfg = CUISINE_CONFIG[cs.plat.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-500' }
                             return (
                               <div className={`rounded-lg border p-1.5 cursor-pointer hover:brightness-95 transition-all ${cfg.bgClass} ${!cs.entree && !cs.dessert ? 'min-h-[70px]' : ''}`} onClick={() => setModalRecette(cs.plat!)}>
-                                <p className={`text-[9px] font-medium mb-0.5 ${cfg.colorClass}`}>{cfg.emoji}</p>
+                                <p className={`text-[9px] font-medium mb-0.5 ${cfg.colorClass}`}>{cfg.emoji} {estSaisonnier(cs.plat) && <span className="text-green-600">🌱</span>}</p>
                                 <p className="text-[11px] font-semibold text-gray-800 leading-tight line-clamp-2">{cs.plat.nom}</p>
-                                {!cs.entree && !cs.dessert && cs.plat.temps_prep && (
-                                  <p className="text-[10px] text-gray-400 mt-1">⏱ {cs.plat.temps_prep}</p>
-                                )}
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  {cs.plat.temps_prep && <span className="text-[9px] text-gray-400">⏱ {cs.plat.temps_prep}</span>}
+                                  <span className="text-[9px] text-gray-400">👤{nbPersonnes}</span>
+                                </div>
                               </div>
                             )
                           })()}
@@ -681,6 +740,29 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
           ) : (
             <p className="text-sm text-gray-400 italic">Instructions non disponibles pour cette recette.</p>
           )}
+
+          {(() => {
+            const cuisine = recette.cuisine?.toLowerCase() ?? ''
+            const prot = detecterProteine(recette.nom)
+            const tips = [
+              ...(ASTUCES_MAP[cuisine] ?? []).slice(0, 2),
+              ...(ASTUCES_MAP[prot] && prot !== 'autre' ? ASTUCES_MAP[prot].slice(0, 1) : []),
+            ].slice(0, 3)
+            if (!tips.length) return null
+            return (
+              <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 className="font-bold text-amber-800 mb-2 text-sm">💡 Astuces & variantes</h3>
+                <ul className="space-y-1.5">
+                  {tips.map((tip, i) => (
+                    <li key={i} className="text-xs text-amber-700 flex items-start gap-2">
+                      <span className="flex-shrink-0 mt-0.5">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
