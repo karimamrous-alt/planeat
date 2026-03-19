@@ -8,22 +8,25 @@ import { supabase } from '@/lib/supabase'
 import { FAMILLE_ID, getMondayOfWeek, formatSemaine, ALL_SLOTS, categoriserIngredient } from '@/lib/utils'
 import type { ArticleCourses } from '@/lib/types'
 
+type IngredientRaw = { raw?: string; nom?: string; singular?: string }
+type RawgredientGroup = { ingredients?: IngredientRaw[] }
+type RecipeData = { recipeRawgredients?: RawgredientGroup[] }
+
 // Parse les ingrédients bruts (string, tableau, format 750g recipeRawgredients, etc.)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extraireIngredients(raw: any): string[] {
+function extraireIngredients(raw: unknown): string[] {
   if (!raw) return []
   try {
-    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const data: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(data)) {
-      return data
-        .map((item: any) => item?.raw || item?.nom || item?.singular || '')
-        .filter((s: string) => s && !s.includes('personne') && !s.includes('portion') && s.length > 2)
+      return (data as IngredientRaw[])
+        .map((item) => item?.raw || item?.nom || item?.singular || '')
+        .filter((s) => s && !s.includes('personne') && !s.includes('portion') && s.length > 2)
     }
-    if (data?.recipeRawgredients) {
-      return data.recipeRawgredients
-        .flatMap((g: any) => g?.ingredients || [])
-        .map((i: any) => i?.raw || i?.singular || '')
-        .filter((s: string) => s && !s.includes('personne') && s.length > 2)
+    if ((data as RecipeData)?.recipeRawgredients) {
+      return ((data as RecipeData).recipeRawgredients ?? [])
+        .flatMap((g) => g?.ingredients ?? [])
+        .map((i) => i?.raw || i?.singular || '')
+        .filter((s) => s && !s.includes('personne') && s.length > 2)
     }
   } catch { /* ignore */ }
   return typeof raw === 'string' ? [raw] : []
