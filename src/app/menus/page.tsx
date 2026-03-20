@@ -7,286 +7,86 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import {
   FAMILLE_ID, getMondayOfWeek, addWeeks, formatSemaine,
-  ALL_SLOTS, JOURS, JOURS_LABELS, REPAS, REPAS_LABELS,
-  CUISINE_CONFIG, parseMinutes, parseCalories, parseIngredients, consolidateIngredients,
-  type SlotKey,
+  JOURS, JOURS_LABELS, REPAS, REPAS_LABELS, JOURS_WEEKEND,
+  CUISINE_CONFIG, CUISINES_SOIR_ONLY, getSlotConfig,
+  detecterProteine, estSaisonnier, getAstuces, SAISON_ACTUELLE,
 } from '@/lib/utils'
-import type { Recette } from '@/lib/types'
+import type { Recette, DayMenu } from '@/lib/types'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types locaux ──────────────────────────────────────────────────────────────
+
+type Repas = 'dejeuner' | 'diner'
+type DaySlots  = Partial<Record<Repas, Recette>>
+type WeekSlots = Partial<Record<string, DaySlots>>
 
 type Structure = 'plat' | 'entree_plat' | 'plat_dessert' | 'entree_plat_dessert'
 
-type CourseSlot = {
-  plat?: Recette
-  entree?: Recette
-  dessert?: Recette
-}
-
-type MenuSlots = Partial<Record<SlotKey, CourseSlot>>
-
-// ── Constantes ────────────────────────────────────────────────────────────────
-
-const JOURS_WEEKEND = new Set(['samedi', 'dimanche'])
-
-const STRUCTURES: { value: Structure; label: string }[] = [
-  { value: 'plat',                label: 'Plat seul' },
-  { value: 'entree_plat',         label: 'Entrée + Plat' },
-  { value: 'plat_dessert',        label: 'Plat + Dessert' },
-  { value: 'entree_plat_dessert', label: 'Entrée + Plat + Dessert' },
-]
+// ── Constantes génération ─────────────────────────────────────────────────────
 
 const MOTS_INTERDITS = [
-  'porc', 'sanglier', 'jambon', 'lardons', 'lard ',
-  'alcool', 'vin ', 'bière', 'biere', 'champagne', 'cidre',
-  'abats', 'foie ', 'rognons', 'tripes',
-  'fruits de mer', 'crevettes', 'homard', 'moule', 'calmar', 'poulpe',
-  'agneau', 'gigot', "côtelette d'agneau", 'mouton',
-  'chorizo', 'pancetta', 'prosciutto', 'saucisson', 'boudin', 'merguez',
-  'cappuccino', 'chocolat chaud',
+  'porc','sanglier','jambon','lardons','lard ','alcool','vin ','bière','champagne',
+  'abats','foie ','rognons','tripes','agneau','gigot','mouton',
+  'chorizo','pancetta','prosciutto','boudin',
 ]
 
-// Items qui ne sont pas des plats principaux
-const MOTS_NON_PLAT = [
-  'naan', 'naans', 'pain ', 'pita', 'chapati', 'focaccia', 'baguette',
-  'sablé', 'biscuit', 'cookie', 'gâteau', 'brownie', 'muffin',
-  'baklava', 'chebakia', 'ghriba', 'sellou', 'msemen', 'baghrir',
-]
+const MOTS_LOURD = ['tajine','couscous','gratin','lasagne','cassoulet']
 
-// Exclure les accompagnements du pool entrée aussi
-const MOTS_ACCOMPAGNEMENT = [
-  'naan', 'naans', 'pain ', 'pita', 'chapati', 'focaccia', 'baguette',
-]
-
-const PROTEINES = [
-  { mots: ['poulet', 'dinde', 'blanc de poulet', 'cuisse de poulet'], label: 'poulet' },
-  { mots: ['bœuf', 'boeuf', 'steak', 'filet de bœuf', 'côte de bœuf'], label: 'boeuf' },
-  { mots: ['haché', 'kefta'], label: 'hache' },
-  { mots: ['poisson', 'saumon', 'cabillaud', 'thon', 'dorade', 'sole'], label: 'poisson' },
-  { mots: ['légumes', 'legumes', 'végétar', 'vegetar', 'pois chiche', 'lentille', 'falafel'], label: 'legumes' },
-]
-
-// Limites hebdomadaires
-const MAX_PROT_WEEK: Record<string, number> = { poulet: 3, boeuf: 2 }
-const MIN_VEG_WEEK = 2
-// Cible calorique journalière pour 6 personnes
-const KCAL_JOUR_CIBLE = 2000
-
-// ── Configuration par slot ────────────────────────────────────────────────────
-
-// Cuisines réservées au soir + week-end uniquement
-const CUISINES_SOIR_SEULEMENT = new Set(['marocaine', 'indienne', 'afghane'])
-const CUISINES_MIDI_SEMAINE   = ['française', 'italienne']
-
-type SlotConfig = { maxMin: number; nbPersonnes: number; cuisinesOnly?: string[] }
-
-function getSlotConfig(jour: string, repas: string): SlotConfig {
-  const isWeekend = JOURS_WEEKEND.has(jour)
-  if (isWeekend)           return { maxMin: 90, nbPersonnes: 6 }
-  if (repas === 'diner')   return { maxMin: 45, nbPersonnes: 6 }
-  // Déjeuner semaine — français/italien uniquement, rapide
-  if (jour === 'mercredi') return { maxMin: 15, nbPersonnes: 6, cuisinesOnly: CUISINES_MIDI_SEMAINE }
-  return { maxMin: 15, nbPersonnes: 2, cuisinesOnly: CUISINES_MIDI_SEMAINE }
-}
-
-// ── Temps total (prep + cuisson) ──────────────────────────────────────────────
-
-function parseMin0(temps: string | null | undefined): number {
-  if (!temps) return 0
-  const hMatch = temps.match(/(\d+)\s*h/i)
-  const mMatch = temps.match(/(\d+)\s*min/i)
-  const numOnly = temps.match(/^(\d+)$/)
-  const h = hMatch ? parseInt(hMatch[1]) : 0
-  const m = mMatch ? parseInt(mMatch[1]) : numOnly ? parseInt(numOnly[1]) : 0
-  return h * 60 + m
-}
-
-function totalMinutes(r: Recette): number {
-  if (r.temps_total) {
-    const t = parseMin0(r.temps_total)
-    if (t > 0) return t
-  }
-  const total = parseMin0(r.temps_prep) + parseMin0(r.temps_cuisson)
-  return total === 0 ? 999 : total
-}
-
-// ── Saisonnalité ──────────────────────────────────────────────────────────────
-
-const MOIS_ACTUEL = new Date().getMonth() + 1 // 1-12
-const SAISON = MOIS_ACTUEL >= 3 && MOIS_ACTUEL <= 5 ? 'printemps'
-             : MOIS_ACTUEL >= 6 && MOIS_ACTUEL <= 8 ? 'ete'
-             : MOIS_ACTUEL >= 9 && MOIS_ACTUEL <= 11 ? 'automne'
-             : 'hiver'
-
-const SAISON_INGREDIENTS: Record<string, string[]> = {
-  printemps: ['petit pois', 'épinard', 'courgette', 'fraise', 'asperge', 'radis', 'artichaut', 'fève'],
-  ete:       ['tomate', 'courgette', 'aubergine', 'poivron', 'concombre', 'melon', 'haricot vert'],
-  automne:   ['potiron', 'courge', 'champignon', 'pomme', 'poire', 'poireau', 'betterave'],
-  hiver:     ['carotte', 'orange', 'clémentine', 'céleri', 'chou', 'endive', 'panais'],
-}
-
-function estSaisonnier(r: Recette): boolean {
-  const ings = SAISON_INGREDIENTS[SAISON] ?? []
-  const ingStr = (Array.isArray(r.ingredients) ? r.ingredients : [])
-    .map(i => typeof i === 'string' ? i : (i as { nom?: string }).nom ?? '')
-    .join(' ').toLowerCase()
-  return ings.some(s => ingStr.includes(s) || r.nom.toLowerCase().includes(s))
-}
-
-// ── Astuces & variantes ───────────────────────────────────────────────────────
-
-const ASTUCES_MAP: Record<string, string[]> = {
-  marocaine: ['Dorer les épices à sec 1 min avant d\'ajouter les liquides', 'Le ras el hanout maison est bien plus parfumé', 'Diluer le safran dans l\'eau tiède 10 min avant de l\'utiliser'],
-  indienne:  ['Faire revenir les épices dans l\'huile 2 min avant tout autre ingrédient', 'Le yaourt attendrit et parfume les viandes en marinade', 'Ajouter le garam masala en toute fin de cuisson'],
-  italienne: ['Saler l\'eau des pâtes généreusement — elle doit avoir le goût de la mer', 'Garder une louche d\'eau de cuisson pour lier la sauce', 'Incorporer le parmesan hors du feu pour ne pas le faire grainer'],
-  française: ['Déglacer la poêle avec un fond de bouillon pour récupérer les sucs', 'Un filet de citron en fin de cuisson rehausse toutes les saveurs', 'Laisser reposer la viande 5 min avant de la couper'],
-  afghane:   ['Les épices afghanes gagnent à être grillées à sec avant d\'être moulues', 'La coriandre fraîche se met toujours en toute fin de cuisson'],
-  poulet:    ['Sortir le poulet du réfrigérateur 20 min avant cuisson pour une cuisson uniforme', 'Piquer la viande avant marinade pour plus de pénétration'],
-  legumes:   ['Ajouter les légumes les plus durs en premier', 'Un filet de citron juste avant service préserve la couleur verte'],
-  hache:     ['Travailler la viande hachée à la main avec les épices pour une meilleure texture', 'Former les boulettes avec les mains légèrement humides'],
-}
-
-const VARIANTES_MAP: Record<string, string> = {
-  marocaine: 'Remplacer la viande par des pois chiches pour une version végétarienne rapide',
-  indienne:  'Utiliser du paneer ou du tofu à la place du poulet',
-  italienne: 'Remplacer les pâtes par des courgettes spiralisées pour une version légère',
-  française: 'Adapter avec les légumes de saison disponibles dans le frigo',
-  afghane:   'Proposer en version wrap avec pain plat pour un repas express',
-  poulet:    'Remplacer par de la dinde ou du blanc de poulet pour une version plus légère',
-  legumes:   'Ajouter des lentilles corail pour enrichir en protéines sans changer le goût',
-  hache:     'Façonner en galettes et cuire à la poêle pour une version express burger',
-  poisson:   'Remplacer par du poulet si le poisson n\'est pas disponible',
-}
-
-// ── Plats lourds & limites ────────────────────────────────────────────────────
-
-const MOTS_LOURD = ['tajine', 'couscous', 'gratin', 'cassoulet', 'daube', 'pot-au-feu', 'bourguignon', 'rôti', 'lasagne']
-const MOTS_TAJINE = ['tajine', 'couscous']
+const MAX_PROT_WEEK: Record<string, number> = { poulet: 3, boeuf: 2, poisson: 2 }
 const MAX_TAJINES_WEEK = 1
+const MIN_VEG_WEEK = 2
 
-function estLourd(r: Recette): boolean {
-  const n = r.nom.toLowerCase()
-  if (MOTS_LOURD.some(m => n.includes(m))) return true
-  const cal = parseCalories(r.calories)
-  return cal > 0 && cal > 750
+function recetteValide(r: Recette): boolean {
+  const n   = r.nom.toLowerCase()
+  const ing = r.ingredients.map(i => i.nom).join(' ').toLowerCase()
+  return !MOTS_INTERDITS.some(kw => n.includes(kw) || ing.includes(kw))
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function recetteEstValide(r: Recette): boolean {
-  const ingStr = (Array.isArray(r.ingredients) ? r.ingredients : [])
-    .map(i => typeof i === 'string' ? i : (i as { nom?: string }).nom ?? '')
-    .join(' ').toLowerCase()
+function totalMin(r: Recette) { return r.temps_prep + r.temps_cuisson }
+function estLourd(r: Recette) {
   const n = r.nom.toLowerCase()
-  return !MOTS_INTERDITS.some(kw => ingStr.includes(kw) || n.includes(kw))
-}
-
-function estNonPlat(r: Recette): boolean {
-  const n = r.nom.toLowerCase()
-  return MOTS_NON_PLAT.some(m => n.includes(m))
-}
-
-function estAccompagnement(r: Recette): boolean {
-  const n = r.nom.toLowerCase()
-  return MOTS_ACCOMPAGNEMENT.some(m => n.includes(m))
-}
-
-function detecterProteine(nom: string): string {
-  const n = nom.toLowerCase()
-  for (const p of PROTEINES) {
-    if (p.mots.some(m => n.includes(m))) return p.label
-  }
-  return 'autre'
+  return MOTS_LOURD.some(m => n.includes(m)) || r.calories > 750
 }
 
 function pickWeighted(
-  candidates: Recette[],
-  protCountWeek: Record<string, number>,
+  pool: Recette[],
+  protWeek: Record<string, number>,
   vegBoost = false,
-  targetCal = 0,
-  saisonnierBoost = true,
+  targetCal = 600,
 ): Recette {
-  const scored = candidates.map(r => {
-    const prot     = detecterProteine(r.nom)
-    const protScore = 1 / (1 + (protCountWeek[prot] ?? 0))
-    const vegScore  = vegBoost && prot === 'legumes' ? 0.25 : 0
-    let calScore = 0
-    if (targetCal > 0) {
-      const cal = parseCalories(r.calories)
-      if (cal > 0) calScore = Math.max(0, 0.15 - Math.abs(cal - targetCal) / 2000)
-    }
-    const saisonScore = saisonnierBoost && estSaisonnier(r) ? 0.15 : 0
-    return { r, score: Math.random() * 0.5 + protScore * 0.3 + vegScore + calScore + saisonScore }
+  const scored = pool.map(r => {
+    const prot = detecterProteine(r.nom)
+    const protS  = 1 / (1 + (protWeek[prot] ?? 0))
+    const vegS   = vegBoost && prot === 'vegetal' ? 0.3 : 0
+    const calS   = r.calories > 0 ? Math.max(0, 0.1 - Math.abs(r.calories - targetCal) / 2000) : 0
+    const saisonS = estSaisonnier(r) ? 0.2 : 0
+    return { r, s: Math.random() * 0.5 + protS * 0.3 + vegS + calS + saisonS }
   })
-  scored.sort((a, b) => b.score - a.score)
+  scored.sort((a, b) => b.s - a.s)
   return scored[0].r
 }
 
-// Encode un slot pour la DB (plain UUID si plat seul, JSON sinon)
-function encodeSlot(cs: CourseSlot): string | null {
-  if (!cs.plat && !cs.entree) return null
-  if (!cs.entree && !cs.dessert) return cs.plat?.id ?? null
-  const obj: Record<string, string> = {}
-  if (cs.entree)  obj.entree  = cs.entree.id
-  if (cs.plat)    obj.plat    = cs.plat.id
-  if (cs.dessert) obj.dessert = cs.dessert.id
-  return JSON.stringify(obj)
-}
-
-function decodeSlot(val: unknown, map: Record<string, Recette>): CourseSlot | null {
-  if (typeof val !== 'string' || !val) return null
-  if (val.startsWith('{')) {
-    try {
-      const obj = JSON.parse(val) as Record<string, string>
-      const cs: CourseSlot = {}
-      if (obj.entree  && map[obj.entree])  cs.entree  = map[obj.entree]
-      if (obj.plat    && map[obj.plat])    cs.plat    = map[obj.plat]
-      if (obj.dessert && map[obj.dessert]) cs.dessert = map[obj.dessert]
-      return (cs.plat || cs.entree) ? cs : null
-    } catch { return null }
-  }
-  return map[val] ? { plat: map[val] } : null
-}
-
-function slotIds(val: unknown): string[] {
-  if (typeof val !== 'string' || !val) return []
-  if (val.startsWith('{')) {
-    try { return Object.values(JSON.parse(val) as Record<string, string>).filter(Boolean) }
-    catch { return [] }
-  }
-  return [val]
-}
-
-// ── Composant ─────────────────────────────────────────────────────────────────
+// ── Composant principal ───────────────────────────────────────────────────────
 
 export default function Menus() {
-  const [semaine, setSemaine]           = useState(getMondayOfWeek())
-  const [structure, setStructure]       = useState<Structure>('plat')
-  const [poolPlats, setPoolPlats]       = useState<Recette[]>([])
-  const [poolEntrees, setPoolEntrees]   = useState<Recette[]>([])
-  const [poolDesserts, setPoolDesserts] = useState<Recette[]>([])
-  const [slots, setSlots]               = useState<MenuSlots>({})
-  const [menuId, setMenuId]             = useState<string | null>(null)
-  const [loading, setLoading]           = useState(true)
-  const [generating, setGenerating]     = useState(false)
-  const [saving, setSaving]             = useState(false)
-  const [savedOk, setSavedOk]           = useState(false)
-  const [modalRecette, setModalRecette] = useState<Recette | null>(null)
+  const [semaine,   setSemaine]   = useState(getMondayOfWeek())
+  const [structure, setStructure] = useState<Structure>('plat')
+  const [pool,      setPool]      = useState<Recette[]>([])
+  const [slots,     setSlots]     = useState<WeekSlots>({})
+  const [menuId,    setMenuId]    = useState<string | null>(null)
+  const [loading,   setLoading]   = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [savedOk,   setSavedOk]   = useState(false)
+  const [modal,     setModal]     = useState<Recette | null>(null)
 
-  // ── Pools ───────────────────────────────────────────────────────────────────
+  // Charger le pool de recettes valides
   useEffect(() => {
-    supabase.from('recettes').select('*').eq('type', 'plat').then(({ data }) => {
-      setPoolPlats((data ?? []).filter(recetteEstValide).filter(r => !estNonPlat(r)))
-    })
-    supabase.from('recettes').select('*').eq('type', 'entree').then(({ data }) => {
-      setPoolEntrees((data ?? []).filter(r => !estAccompagnement(r)))
-    })
-    supabase.from('recettes').select('*').eq('type', 'dessert').then(({ data }) => {
-      setPoolDesserts(data ?? [])
+    supabase.from('recettes').select('*').in('type', ['plat','soupe']).then(({ data }) => {
+      setPool((data ?? []).filter(recetteValide))
     })
   }, [])
 
-  // ── Charger le menu ────────────────────────────────────────────────────────
+  // Charger le menu existant
   const chargerMenu = useCallback(async (sem: string) => {
     setLoading(true)
     const { data: menuRow } = await supabase
@@ -297,15 +97,23 @@ export default function Menus() {
     if (!menuRow) { setSlots({}); setMenuId(null); setLoading(false); return }
     setMenuId(menuRow.id)
 
-    const allIds = [...new Set(ALL_SLOTS.flatMap(s => slotIds((menuRow as Record<string, unknown>)[s])))]
-    if (!allIds.length) { setSlots({}); setLoading(false); return }
+    const allIds = new Set<string>()
+    for (const day of Object.values(menuRow.jours as Record<string, DayMenu>)) {
+      if (day.dejeuner) allIds.add(day.dejeuner)
+      if (day.diner)    allIds.add(day.diner)
+    }
 
-    const { data: recs } = await supabase.from('recettes').select('*').in('id', allIds)
-    const map: Record<string, Recette> = Object.fromEntries((recs ?? []).map(r => [r.id, r]))
-    const rebuilt: MenuSlots = {}
-    for (const s of ALL_SLOTS) {
-      const cs = decodeSlot((menuRow as Record<string, unknown>)[s], map)
-      if (cs) rebuilt[s as SlotKey] = cs
+    if (!allIds.size) { setSlots({}); setLoading(false); return }
+
+    const { data: recs } = await supabase.from('recettes').select('*').in('id', [...allIds])
+    const map = Object.fromEntries((recs ?? []).map((r: Recette) => [r.id, r]))
+
+    const rebuilt: WeekSlots = {}
+    for (const [jour, day] of Object.entries(menuRow.jours as Record<string, DayMenu>)) {
+      const ds: DaySlots = {}
+      if (day.dejeuner && map[day.dejeuner]) ds.dejeuner = map[day.dejeuner]
+      if (day.diner    && map[day.diner])    ds.diner    = map[day.diner]
+      if (ds.dejeuner || ds.diner) rebuilt[jour] = ds
     }
     setSlots(rebuilt)
     setLoading(false)
@@ -313,130 +121,79 @@ export default function Menus() {
 
   useEffect(() => { chargerMenu(semaine) }, [semaine, chargerMenu])
 
-  // ── Génération intelligente ────────────────────────────────────────────────
+  // ── Génération complète ────────────────────────────────────────────────────
   const genererTout = () => {
-    if (!poolPlats.length) return
+    if (!pool.length) return
     setGenerating(true)
 
-    const needsEntree  = structure === 'entree_plat'  || structure === 'entree_plat_dessert'
-    const needsDessert = structure === 'plat_dessert' || structure === 'entree_plat_dessert'
-
-    const usedPlats    = new Set<string>()
-    const usedEntrees  = new Set<string>()
-    const usedDesserts = new Set<string>()
-
-    // Suivi hebdomadaire
-    const protCountWeek: Record<string, number> = {}
-    let vegCount    = 0
+    const usedIds   = new Set<string>()
+    const protWeek: Record<string, number> = {}
+    let vegCount   = 0
     let tajineCount = 0
 
-    const generated: MenuSlots = {}
+    const generated: WeekSlots = {}
 
-    for (let jourIdx = 0; jourIdx < JOURS.length; jourIdx++) {
-      const jour = JOURS[jourIdx]
+    for (let ji = 0; ji < JOURS.length; ji++) {
+      const jour = JOURS[ji]
+      const proteinesJour = new Set<string>()
+      let lourdsJour = 0
 
-      // Suivi journalier
-      const proteinesDeJour = new Set<string>()
-      const cuisinesDeJour  = new Set<string>()
-      let calDeJour  = 0
-      let lourdsDeJour = 0
-
-      for (let repasIdx = 0; repasIdx < REPAS.length; repasIdx++) {
-        const repas = REPAS[repasIdx]
-        const slot  = `${jour}_${repas}` as SlotKey
+      for (let ri = 0; ri < REPAS.length; ri++) {
+        const repas = REPAS[ri]
         const { maxMin, cuisinesOnly } = getSlotConfig(jour, repas)
 
-        // Slots restants dans la semaine (y compris celui-ci)
-        const slotsLeft = (JOURS.length - jourIdx - 1) * REPAS.length + (REPAS.length - repasIdx)
+        const slotsLeft = (JOURS.length - ji - 1) * 2 + (2 - ri)
         const vegNeeded = MIN_VEG_WEEK - vegCount
-        const mustBeVeg = vegNeeded > 0 && vegNeeded >= slotsLeft
-
-        // Cible calorique pour ce repas
-        const calRestante = Math.max(300, KCAL_JOUR_CIBLE - calDeJour)
+        const mustVeg   = vegNeeded > 0 && vegNeeded >= slotsLeft
 
         const passesTime = (r: Recette) => {
-          const t = totalMinutes(r)
-          return t === 999 ? (repas === 'diner' || JOURS_WEEKEND.has(jour)) : t <= maxMin
+          const t = totalMin(r); return t === 0 ? !JOURS_WEEKEND.has(jour) || repas === 'diner' : t <= maxMin
         }
-
         const passesCuisine = (r: Recette) =>
           !cuisinesOnly || cuisinesOnly.includes(r.cuisine)
+        const passesSoir = (r: Recette) =>
+          !CUISINES_SOIR_ONLY.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
 
-        const passesSoirOnly = (r: Recette) =>
-          !CUISINES_SOIR_SEULEMENT.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
-
-        // Filtre strict (cuisine + protéine du jour + limites semaine + lourd)
-        const filterStrict = (r: Recette) => {
-          if (usedPlats.has(r.id)) return false
-          if (!passesTime(r)) return false
-          if (!passesCuisine(r)) return false
-          if (!passesSoirOnly(r)) return false
-          if (cuisinesDeJour.has(r.cuisine)) return false
+        const filterFull = (r: Recette) => {
+          if (usedIds.has(r.id)) return false
+          if (!passesTime(r) || !passesCuisine(r) || !passesSoir(r)) return false
           const p = detecterProteine(r.nom)
-          if (proteinesDeJour.has(p) && p !== 'autre') return false
-          if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
-          if (mustBeVeg && p !== 'legumes') return false
-          if (lourdsDeJour >= 1 && estLourd(r)) return false
-          if (tajineCount >= MAX_TAJINES_WEEK && MOTS_TAJINE.some(m => r.nom.toLowerCase().includes(m))) return false
+          if (proteinesJour.has(p) && p !== 'autre') return false
+          if (MAX_PROT_WEEK[p] && (protWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
+          if (mustVeg && p !== 'vegetal') return false
+          if (lourdsJour >= 1 && estLourd(r)) return false
+          if (tajineCount >= MAX_TAJINES_WEEK && MOTS_LOURD.slice(0,2).some(m => r.nom.toLowerCase().includes(m))) return false
           return true
         }
 
-        // Filtre relaxé (sans contrainte de cuisine du jour)
         const filterRelaxed = (r: Recette) => {
-          if (usedPlats.has(r.id)) return false
-          if (!passesTime(r)) return false
-          if (!passesCuisine(r)) return false
-          if (!passesSoirOnly(r)) return false
+          if (usedIds.has(r.id)) return false
+          if (!passesTime(r) || !passesCuisine(r) || !passesSoir(r)) return false
           const p = detecterProteine(r.nom)
-          if (proteinesDeJour.has(p) && p !== 'autre') return false
-          if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
-          if (mustBeVeg && p !== 'legumes') return false
-          if (lourdsDeJour >= 1 && estLourd(r)) return false
+          if (proteinesJour.has(p) && p !== 'autre') return false
           return true
         }
 
-        // Filtre minimal — au moins pas utilisé + respect cuisine obligatoire
         const filterMin = (r: Recette) =>
-          !usedPlats.has(r.id) && passesCuisine(r) && passesSoirOnly(r)
+          !usedIds.has(r.id) && passesCuisine(r) && passesSoir(r)
 
-        let candidates = poolPlats.filter(filterStrict)
-        if (!candidates.length) candidates = poolPlats.filter(filterRelaxed)
-        if (!candidates.length) candidates = poolPlats.filter(filterMin)
+        let candidates = pool.filter(filterFull)
+        if (!candidates.length) candidates = pool.filter(filterRelaxed)
+        if (!candidates.length) candidates = pool.filter(filterMin)
         if (!candidates.length) continue
 
-        const vegBoost = vegNeeded > 0 && !mustBeVeg
-        const plat = pickWeighted(candidates, protCountWeek, vegBoost, calRestante)
+        const rec = pickWeighted(candidates, protWeek, vegNeeded > 0 && !mustVeg, repas === 'dejeuner' ? 400 : 600)
+        const prot = detecterProteine(rec.nom)
 
-        const cs: CourseSlot = { plat }
-        usedPlats.add(plat.id)
-        cuisinesDeJour.add(plat.cuisine)
-        const prot = detecterProteine(plat.nom)
-        proteinesDeJour.add(prot)
-        protCountWeek[prot] = (protCountWeek[prot] ?? 0) + 1
-        if (prot === 'legumes') vegCount++
-        if (estLourd(plat)) lourdsDeJour++
-        if (MOTS_TAJINE.some(m => plat.nom.toLowerCase().includes(m))) tajineCount++
-        calDeJour += parseCalories(plat.calories)
+        usedIds.add(rec.id)
+        proteinesJour.add(prot)
+        protWeek[prot] = (protWeek[prot] ?? 0) + 1
+        if (prot === 'vegetal') vegCount++
+        if (estLourd(rec)) lourdsJour++
+        if (MOTS_LOURD.slice(0,2).some(m => rec.nom.toLowerCase().includes(m))) tajineCount++
 
-        // Entrée
-        if (needsEntree && poolEntrees.length) {
-          const c = poolEntrees.filter(r => !usedEntrees.has(r.id))
-          const src = c.length ? c : poolEntrees
-          const e = src[Math.floor(Math.random() * src.length)]
-          cs.entree = e
-          usedEntrees.add(e.id)
-        }
-
-        // Dessert
-        if (needsDessert && poolDesserts.length) {
-          const c = poolDesserts.filter(r => !usedDesserts.has(r.id))
-          const src = c.length ? c : poolDesserts
-          const d = src[Math.floor(Math.random() * src.length)]
-          cs.dessert = d
-          usedDesserts.add(d.id)
-        }
-
-        generated[slot] = cs
+        if (!generated[jour]) generated[jour] = {}
+        generated[jour]![repas] = rec
       }
     }
 
@@ -445,110 +202,75 @@ export default function Menus() {
   }
 
   // ── Régénérer un slot ──────────────────────────────────────────────────────
-  const regenererSlot = (slot: SlotKey) => {
-    if (!poolPlats.length) return
-    const [jour, repas] = slot.split('_')
-    const { maxMin } = getSlotConfig(jour, repas)
-    const needsEntree  = structure === 'entree_plat'  || structure === 'entree_plat_dessert'
-    const needsDessert = structure === 'plat_dessert' || structure === 'entree_plat_dessert'
-
-    // Protéines déjà dans ce jour (hors slot courant)
-    const proteinesDeJour = new Set(
-      REPAS.map(r => `${jour}_${r}` as SlotKey)
-        .filter(s => s !== slot && slots[s]?.plat)
-        .map(s => detecterProteine(slots[s]!.plat!.nom))
+  const regenererSlot = (jour: string, repas: Repas) => {
+    const { maxMin, cuisinesOnly } = getSlotConfig(jour, repas)
+    const proteinesJour = new Set(
+      REPAS.filter(r => r !== repas && slots[jour]?.[r])
+           .map(r => detecterProteine(slots[jour]![r]!.nom))
     )
-
-    // Compteurs semaine (hors slot courant)
-    const protCountWeek: Record<string, number> = {}
-    Object.entries(slots).filter(([k]) => k !== slot).forEach(([, cs]) => {
-      if (cs?.plat) {
-        const p = detecterProteine(cs.plat.nom)
-        protCountWeek[p] = (protCountWeek[p] ?? 0) + 1
-      }
-    })
-
-    const usedPlatIds = new Set(
-      Object.entries(slots).filter(([k]) => k !== slot).map(([, v]) => v?.plat?.id).filter(Boolean) as string[]
+    const usedIds = new Set(
+      Object.entries(slots).flatMap(([, d]) => d ? Object.values(d).map(r => r?.id ?? '') : []).filter(Boolean)
     )
-
-    const { cuisinesOnly } = getSlotConfig(jour, repas)
-    const passesTime = (r: Recette) => {
-      const t = totalMinutes(r)
-      return t === 999 ? (repas === 'diner' || JOURS_WEEKEND.has(jour)) : t <= maxMin
-    }
     const passesCuisine = (r: Recette) => !cuisinesOnly || cuisinesOnly.includes(r.cuisine)
-    const passesSoirOnly = (r: Recette) =>
-      !CUISINES_SOIR_SEULEMENT.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
+    const passesSoir    = (r: Recette) => !CUISINES_SOIR_ONLY.has(r.cuisine) || repas === 'diner' || JOURS_WEEKEND.has(jour)
 
-    let candidates = poolPlats.filter(r => {
-      if (usedPlatIds.has(r.id)) return false
-      if (!passesTime(r)) return false
-      if (!passesCuisine(r)) return false
-      if (!passesSoirOnly(r)) return false
+    let candidates = pool.filter(r => {
+      if (usedIds.has(r.id)) return false
+      const t = totalMin(r); if (t > 0 && t > maxMin) return false
+      if (!passesCuisine(r) || !passesSoir(r)) return false
       const p = detecterProteine(r.nom)
-      if (proteinesDeJour.has(p) && p !== 'autre') return false
-      if (MAX_PROT_WEEK[p] && (protCountWeek[p] ?? 0) >= MAX_PROT_WEEK[p]) return false
+      if (proteinesJour.has(p) && p !== 'autre') return false
       return true
     })
-    if (!candidates.length)
-      candidates = poolPlats.filter(r => !usedPlatIds.has(r.id) && passesCuisine(r) && passesSoirOnly(r))
+    if (!candidates.length) candidates = pool.filter(r => !usedIds.has(r.id) && passesCuisine(r) && passesSoir(r))
     if (!candidates.length) return
 
-    const cs: CourseSlot = { plat: pickWeighted(candidates, protCountWeek) }
-    if (needsEntree && poolEntrees.length)
-      cs.entree = poolEntrees[Math.floor(Math.random() * poolEntrees.length)]
-    if (needsDessert && poolDesserts.length)
-      cs.dessert = poolDesserts[Math.floor(Math.random() * poolDesserts.length)]
-
-    setSlots(prev => ({ ...prev, [slot]: cs }))
+    const rec = pickWeighted(candidates, {})
+    setSlots(prev => ({ ...prev, [jour]: { ...(prev[jour] ?? {}), [repas]: rec } }))
   }
 
-  // ── Valider ────────────────────────────────────────────────────────────────
+  // ── Valider / Sauvegarder ──────────────────────────────────────────────────
   const valider = async () => {
-    if (Object.keys(slots).length === 0) return
+    if (!Object.keys(slots).length) return
     setSaving(true)
 
-    const payload: Record<string, unknown> = { famille_id: FAMILLE_ID, semaine }
-    for (const slot of ALL_SLOTS) {
-      const cs = slots[slot as SlotKey]
-      payload[slot] = cs ? encodeSlot(cs) : null
+    const jours: Record<string, DayMenu> = {}
+    for (const jour of JOURS) {
+      jours[jour] = {
+        dejeuner: slots[jour]?.dejeuner?.id ?? undefined,
+        diner:    slots[jour]?.diner?.id    ?? undefined,
+      }
     }
 
     const { data: saved, error } = await supabase
       .from('menus')
-      .upsert(payload, { onConflict: 'famille_id,semaine' })
+      .upsert({ famille_id: FAMILLE_ID, semaine, jours }, { onConflict: 'famille_id,semaine' })
       .select('id').single()
 
     if (!error && saved) {
       setMenuId(saved.id)
-      const allRecettes = Object.values(slots)
-        .flatMap(cs => [cs?.entree, cs?.plat, cs?.dessert])
-        .filter((r): r is Recette => !!r)
-      const consolidated = consolidateIngredients(allRecettes)
-      await supabase.from('liste_courses').upsert(
-        { menu_id: saved.id, famille_id: FAMILLE_ID, semaine, ingredients_consolides: consolidated, articles_manuels: [] },
-        { onConflict: 'menu_id' }
-      )
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 3000)
     }
     setSaving(false)
   }
 
-  const nbSlotsFilled = ALL_SLOTS.filter(s => slots[s as SlotKey]).length
+  const nbFilled = Object.values(slots).reduce((s, d) => s + (d?.dejeuner ? 1 : 0) + (d?.diner ? 1 : 0), 0)
 
+  // ── Rendu ──────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in space-y-6">
       {/* En-tête */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">📅 Génération de menus</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Planifiez vos repas de la semaine</p>
+          <h1 className="text-2xl font-bold text-gray-800">📅 Menus de la semaine</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            Planifiez vos repas · Printemps 🌱
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-4 py-2">
           <button onClick={() => setSemaine(s => addWeeks(s, -1))} className="text-gray-500 hover:text-green-700 font-bold text-lg px-1">‹</button>
-          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Semaine du {formatSemaine(semaine)}</span>
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sem. du {formatSemaine(semaine)}</span>
           <button onClick={() => setSemaine(s => addWeeks(s, 1))} className="text-gray-500 hover:text-green-700 font-bold text-lg px-1">›</button>
         </div>
       </div>
@@ -557,34 +279,29 @@ export default function Menus() {
       <div className="bg-white rounded-2xl border border-gray-200 p-4">
         <p className="text-sm font-semibold text-gray-700 mb-3">Structure du repas</p>
         <div className="flex flex-wrap gap-2">
-          {STRUCTURES.map(s => (
-            <button
-              key={s.value}
-              onClick={() => setStructure(s.value)}
+          {[
+            { v: 'plat',                 l: 'Plat seul' },
+            { v: 'entree_plat',          l: 'Entrée + Plat' },
+            { v: 'plat_dessert',         l: 'Plat + Dessert' },
+            { v: 'entree_plat_dessert',  l: 'Entrée + Plat + Dessert' },
+          ].map(s => (
+            <button key={s.v} onClick={() => setStructure(s.v as Structure)}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                structure === s.value
-                  ? 'bg-green-700 text-white border-green-700'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                structure === s.v ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
               }`}
-            >
-              {s.label}
-            </button>
+            >{s.l}</button>
           ))}
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 items-center">
-        <button
-          onClick={genererTout}
-          disabled={generating || !poolPlats.length}
+        <button onClick={genererTout} disabled={generating || !pool.length}
           className="inline-flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {generating ? <span className="spinner" /> : '✨'} Générer tout
         </button>
-        <button
-          onClick={valider}
-          disabled={saving || nbSlotsFilled === 0}
+        <button onClick={valider} disabled={saving || nbFilled === 0}
           className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {saving ? <span className="spinner" /> : savedOk ? '✅' : '💾'}
@@ -595,7 +312,7 @@ export default function Menus() {
             🛒 Voir les courses
           </Link>
         )}
-        <span className="text-sm text-gray-400 ml-auto">{nbSlotsFilled}/14 repas</span>
+        <span className="text-sm text-gray-400 ml-auto">{nbFilled}/14 repas</span>
       </div>
 
       {/* Grille */}
@@ -603,80 +320,72 @@ export default function Menus() {
         <div className="flex items-center justify-center h-48"><div className="spinner text-green-700" /></div>
       ) : (
         <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
+          <div className="min-w-[700px]">
+            {/* En-têtes jours */}
             <div className="grid grid-cols-8 gap-2 mb-2">
-              <div className="col-span-1" />
+              <div />
               {JOURS.map(jour => {
                 const calJour = REPAS.reduce((sum, r) => {
-                  const cs = slots[`${jour}_${r}` as SlotKey]
-                  return sum + (cs?.plat ? parseCalories(cs.plat.calories) : 0)
+                  const rec = slots[jour]?.[r as Repas]
+                  return sum + (rec?.calories ?? 0)
                 }, 0)
-                const calDot = calJour === 0 ? null : calJour < 800 ? '🟢' : calJour < 1600 ? '🟠' : '🔴'
+                const dot = calJour === 0 ? null : calJour < 900 ? '🟢' : calJour < 1600 ? '🟠' : '🔴'
                 return (
                   <div key={jour} className={`col-span-1 text-center text-xs font-bold uppercase tracking-wide py-2 ${JOURS_WEEKEND.has(jour) ? 'text-orange-500' : 'text-gray-600'}`}>
                     {JOURS_LABELS[jour].slice(0, 3)}
-                    {calDot
-                      ? <span className="block text-[9px] normal-case tracking-normal font-normal">{calDot} {calJour} kcal</span>
-                      : JOURS_WEEKEND.has(jour) && <span className="block text-orange-300 text-[9px] normal-case tracking-normal">week-end</span>
+                    {dot
+                      ? <span className="block text-[9px] normal-case font-normal">{dot} {calJour} kcal</span>
+                      : JOURS_WEEKEND.has(jour) && <span className="block text-orange-300 text-[9px] normal-case font-normal">W-E</span>
                     }
                   </div>
                 )
               })}
             </div>
 
-            {REPAS.map(repas => (
+            {/* Lignes repas */}
+            {(['dejeuner','diner'] as const).map(repas => (
               <div key={repas} className="grid grid-cols-8 gap-2 mb-2">
-                <div className="col-span-1 flex items-center">
+                <div className="flex items-center">
                   <span className="text-xs font-medium text-gray-500 whitespace-nowrap">{REPAS_LABELS[repas]}</span>
                 </div>
                 {JOURS.map(jour => {
-                  const slot = `${jour}_${repas}` as SlotKey
-                  const cs   = slots[slot]
+                  const rec = slots[jour]?.[repas]
                   const { nbPersonnes } = getSlotConfig(jour, repas)
                   return (
-                    <div key={slot} className="col-span-1">
-                      {cs ? (
-                        <div className="relative group space-y-1">
+                    <div key={jour} className="col-span-1">
+                      {rec ? (
+                        <div className="relative group">
                           <button
-                            onClick={e => { e.stopPropagation(); regenererSlot(slot) }}
+                            onClick={() => regenererSlot(jour, repas)}
                             title="Régénérer"
                             className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-green-700 hover:border-green-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-xs shadow"
                           >↻</button>
-
-                          {cs.entree && (
-                            <div className="rounded-lg border bg-blue-50 border-blue-200 p-1.5 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setModalRecette(cs.entree!)}>
-                              <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wide mb-0.5">Entrée</p>
-                              <p className="text-[11px] font-semibold text-gray-700 leading-tight line-clamp-2">{cs.entree.nom}</p>
-                            </div>
-                          )}
-
-                          {cs.plat && (() => {
-                            const cfg = CUISINE_CONFIG[cs.plat.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-500' }
+                          {(() => {
+                            const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji:'🍴', bgClass:'bg-gray-50 border-gray-200', colorClass:'text-gray-500' }
                             return (
-                              <div className={`rounded-lg border p-1.5 cursor-pointer hover:brightness-95 transition-all ${cfg.bgClass} ${!cs.entree && !cs.dessert ? 'min-h-[70px]' : ''}`} onClick={() => setModalRecette(cs.plat!)}>
-                                <p className={`text-[9px] font-medium mb-0.5 ${cfg.colorClass}`}>{cfg.emoji} {estSaisonnier(cs.plat) && <span className="text-green-600">🌱</span>}</p>
-                                <p className="text-[11px] font-semibold text-gray-800 leading-tight line-clamp-2">{cs.plat.nom}</p>
+                              <div
+                                className={`rounded-lg border p-1.5 min-h-[72px] cursor-pointer hover:brightness-95 transition-all ${cfg.bgClass}`}
+                                onClick={() => setModal(rec)}
+                              >
+                                <p className={`text-[9px] font-medium mb-0.5 ${cfg.colorClass}`}>
+                                  {cfg.emoji} {estSaisonnier(rec) && '🌱'}
+                                </p>
+                                <p className="text-[11px] font-semibold text-gray-800 leading-tight line-clamp-2">{rec.nom}</p>
                                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  {cs.plat.temps_prep && <span className="text-[9px] text-gray-400">⏱ {cs.plat.temps_prep}</span>}
+                                  {totalMin(rec) > 0 && <span className="text-[9px] text-gray-400">⏱{totalMin(rec)}'</span>}
+                                  {rec.calories > 0  && <span className="text-[9px] text-gray-400">{rec.calories}kcal</span>}
                                   <span className="text-[9px] text-gray-400">👤{nbPersonnes}</span>
                                 </div>
                               </div>
                             )
                           })()}
-
-                          {cs.dessert && (
-                            <div className="rounded-lg border bg-pink-50 border-pink-200 p-1.5 cursor-pointer hover:bg-pink-100 transition-colors" onClick={() => setModalRecette(cs.dessert!)}>
-                              <p className="text-[9px] font-bold text-pink-400 uppercase tracking-wide mb-0.5">Dessert</p>
-                              <p className="text-[11px] font-semibold text-gray-700 leading-tight line-clamp-2">{cs.dessert.nom}</p>
-                            </div>
-                          )}
                         </div>
                       ) : (
                         <button
-                          onClick={() => regenererSlot(slot)}
-                          className="w-full min-h-[70px] rounded-xl border-2 border-dashed border-gray-200 text-gray-300 hover:border-green-400 hover:text-green-500 transition-colors text-xs flex items-center justify-center"
+                          onClick={() => regenererSlot(jour, repas)}
+                          className="w-full min-h-[72px] rounded-xl border-2 border-dashed border-gray-200 text-gray-300 hover:border-green-400 hover:text-green-500 transition-colors text-xs flex items-center justify-center"
                         >
-                          + Ajouter
+                          +
                         </button>
                       )}
                     </div>
@@ -688,7 +397,7 @@ export default function Menus() {
         </div>
       )}
 
-      {!loading && nbSlotsFilled === 0 && poolPlats.length > 0 && (
+      {!loading && nbFilled === 0 && pool.length > 0 && (
         <div className="text-center py-8 bg-white rounded-2xl border border-gray-200">
           <p className="text-4xl mb-3">🍽️</p>
           <p className="text-gray-500 mb-4">Aucun menu généré pour cette semaine.</p>
@@ -698,36 +407,16 @@ export default function Menus() {
         </div>
       )}
 
-      {!loading && poolPlats.length === 0 && (
-        <div className="text-center py-8 bg-amber-50 border border-amber-200 rounded-2xl">
-          <p className="text-amber-700">Aucune recette halal disponible.</p>
-        </div>
-      )}
-
-      {modalRecette && <RecetteModal recette={modalRecette} onClose={() => setModalRecette(null)} />}
+      {modal && <RecetteModal recette={modal} onClose={() => setModal(null)} />}
     </div>
   )
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────────
+// ── Modal recette ─────────────────────────────────────────────────────────────
 
-const NB_FAMILLE = 6
-
-function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => void }) {
-  const cfg = CUISINE_CONFIG[recette.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-600' }
-
-  const nbRecette = (() => {
-    const m = String(recette.nb_personnes ?? '').match(/\d+/)
-    return m ? parseInt(m[0]) : 0
-  })()
-  const ratio = nbRecette > 1 ? NB_FAMILLE / nbRecette : 1
-
-  const scaleQty = (q: string): string => {
-    if (!q || ratio === 1) return q
-    const m = q.match(/^(\d+(?:[.,]\d+)?)(.*)$/)
-    if (!m) return q
-    return `${Math.round(parseFloat(m[1].replace(',', '.')) * ratio * 10) / 10}${m[2]}`
-  }
+function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () => void }) {
+  const cfg = CUISINE_CONFIG[r.cuisine] ?? { emoji:'🍴', bgClass:'bg-gray-50 border-gray-200', colorClass:'text-gray-600' }
+  const { astuces, variante } = getAstuces(r)
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -735,87 +424,68 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  // Utiliser parseIngredients pour un parsing robuste
-  const parsed = parseIngredients(recette.ingredients)
-  const ingredients = parsed.map(ing => {
-    const q = [ing.quantite ? scaleQty(ing.quantite) : '', ing.unite].filter(Boolean).join('\u00a0')
-    return q ? `${q} ${ing.nom}`.trim() : ing.nom
-  })
-
-  const instructions: string[] = Array.isArray(recette.instructions) ? recette.instructions : []
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-        {recette.image_url && (
-          <div className="w-full h-48 overflow-hidden rounded-t-2xl bg-gray-100">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+        {r.photo_url && (
+          <div className="w-full h-48 overflow-hidden rounded-t-3xl sm:rounded-t-2xl bg-gray-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={recette.image_url} alt={recette.nom} className="w-full h-full object-cover" />
+            <img src={r.photo_url} alt={r.nom} className="w-full h-full object-cover" />
           </div>
         )}
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 pr-4">
-              <h2 className="text-xl font-bold text-gray-800 leading-tight">{recette.nom}</h2>
-              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full border mt-2 ${cfg.bgClass} ${cfg.colorClass}`}>
-                {cfg.emoji} {recette.cuisine}
-              </span>
+              <h2 className="text-xl font-bold text-gray-800 leading-tight">{r.nom}</h2>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full border ${cfg.bgClass} ${cfg.colorClass}`}>
+                  {cfg.emoji} {r.cuisine}
+                </span>
+                {estSaisonnier(r) && (
+                  <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full">🌱 De saison ({SAISON_ACTUELLE})</span>
+                )}
+              </div>
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none flex-shrink-0">×</button>
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-5 text-sm text-gray-600">
-            {recette.temps_prep && (
-              <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">⏱ Prép. {recette.temps_prep}</span>
-            )}
-            {recette.temps_cuisson && (
-              <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">🔥 Cuisson {recette.temps_cuisson}</span>
-            )}
-            {recette.nb_personnes && (
-              <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
-                👤 {nbRecette > 0 && nbRecette !== NB_FAMILLE ? `Pour ${NB_FAMILLE} personnes` : recette.nb_personnes}
-              </span>
-            )}
-            {recette.calories && (
-              <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
-                🔥 {recette.calories}
-              </span>
-            )}
-            {recette.difficulte && (
-              <span className={`px-3 py-1 rounded-full border font-medium text-xs ${
-                recette.difficulte === 'facile'   ? 'bg-green-50  text-green-700  border-green-200'  :
-                recette.difficulte === 'difficile'? 'bg-red-50    text-red-700    border-red-200'    :
-                                                    'bg-orange-50 text-orange-700 border-orange-200'
-              }`}>{recette.difficulte}</span>
+          {/* Méta */}
+          <div className="flex flex-wrap gap-2 mb-5 text-sm">
+            {totalMin(r) > 0    && <span className="bg-gray-50 border border-gray-200 px-3 py-1 rounded-full text-gray-600">⏱ {totalMin(r)} min</span>}
+            {r.personnes > 0    && <span className="bg-gray-50 border border-gray-200 px-3 py-1 rounded-full text-gray-600">👤 {r.personnes} pers.</span>}
+            {r.calories > 0     && <span className="bg-gray-50 border border-gray-200 px-3 py-1 rounded-full text-gray-600">🔥 {r.calories} kcal</span>}
+            {r.niveau_epices    && (
+              <span className={`px-3 py-1 rounded-full border text-xs font-medium ${
+                r.niveau_epices === 'doux'   ? 'bg-green-50 text-green-700 border-green-200' :
+                r.niveau_epices === 'fort'   ? 'bg-red-50 text-red-700 border-red-200' :
+                                               'bg-orange-50 text-orange-700 border-orange-200'
+              }`}>{r.niveau_epices}</span>
             )}
           </div>
 
-          {ingredients.length > 0 && (
+          {/* Ingrédients */}
+          {r.ingredients.length > 0 && (
             <div className="mb-5">
-              <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                Ingrédients
-                {ratio !== 1 && (
-                  <span className="text-xs font-normal text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-                    adapté pour {NB_FAMILLE} pers.
-                  </span>
-                )}
-              </h3>
+              <h3 className="font-bold text-gray-700 mb-3">Ingrédients</h3>
               <ul className="space-y-1.5">
-                {ingredients.map((ing, i) => (
+                {r.ingredients.map((ing, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                     <span className="text-green-500 mt-0.5 flex-shrink-0">•</span>
-                    <span>{ing}</span>
+                    <span>
+                      {[ing.quantite, ing.unite, ing.nom].filter(Boolean).join('\u00a0')}
+                    </span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {instructions.length > 0 ? (
-            <div>
+          {/* Instructions */}
+          {r.instructions.length > 0 ? (
+            <div className="mb-5">
               <h3 className="font-bold text-gray-700 mb-3">Préparation</h3>
               <ol className="space-y-3">
-                {instructions.map((etape, i) => (
+                {r.instructions.map((etape, i) => (
                   <li key={i} className="flex gap-3 text-sm text-gray-700">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-700 text-white text-xs flex items-center justify-center font-bold">{i + 1}</span>
                     <span className="leading-relaxed pt-0.5">{etape}</span>
@@ -824,42 +494,32 @@ function RecetteModal({ recette, onClose }: { recette: Recette; onClose: () => v
               </ol>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic">Instructions non disponibles pour cette recette.</p>
+            <p className="text-sm text-gray-400 italic mb-5">Instructions non disponibles.</p>
           )}
 
-          {(() => {
-            const cuisine = recette.cuisine?.toLowerCase() ?? ''
-            const prot = detecterProteine(recette.nom)
-            const tips = [
-              ...(ASTUCES_MAP[cuisine] ?? []).slice(0, 2),
-              ...(ASTUCES_MAP[prot] && prot !== 'autre' ? ASTUCES_MAP[prot].slice(0, 1) : []),
-            ].slice(0, 3)
-            const variante = VARIANTES_MAP[cuisine] || (prot !== 'autre' ? VARIANTES_MAP[prot] : null)
-            if (!tips.length && !variante) return null
-            return (
-              <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                {tips.length > 0 && (
-                  <div>
-                    <h3 className="font-bold text-amber-800 mb-2 text-sm">💡 Astuces</h3>
-                    <ul className="space-y-1.5">
-                      {tips.map((tip, i) => (
-                        <li key={i} className="text-xs text-amber-700 flex items-start gap-2">
-                          <span className="flex-shrink-0 mt-0.5">•</span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {variante && (
-                  <div>
-                    <h3 className="font-bold text-amber-800 mb-1 text-sm">🔄 Variante rapide</h3>
-                    <p className="text-xs text-amber-700">{variante}</p>
-                  </div>
-                )}
-              </div>
-            )
-          })()}
+          {/* Astuces & Variante */}
+          {(astuces.length > 0 || variante) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              {astuces.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-amber-800 mb-2 text-sm">💡 Astuces</h3>
+                  <ul className="space-y-1">
+                    {astuces.map((tip, i) => (
+                      <li key={i} className="text-xs text-amber-700 flex gap-2">
+                        <span className="flex-shrink-0">•</span><span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {variante && (
+                <div>
+                  <h3 className="font-bold text-amber-800 mb-1 text-sm">🔄 Variante</h3>
+                  <p className="text-xs text-amber-700">{variante}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

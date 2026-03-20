@@ -1,38 +1,75 @@
-import type { Recette, ArticleCourses } from './types'
+import type { Recette } from './types'
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 
 export const FAMILLE_ID = 'e857128f-7da2-4e00-832e-58169161be40'
 
 export const CUISINE_CONFIG: Record<string, { emoji: string; colorClass: string; bgClass: string }> = {
-  marocaine: { emoji: '🇲🇦', colorClass: 'text-red-700',    bgClass: 'bg-red-50 border-red-200' },
-  indienne:  { emoji: '🇮🇳', colorClass: 'text-orange-700', bgClass: 'bg-orange-50 border-orange-200' },
-  afghane:   { emoji: '🇦🇫', colorClass: 'text-sky-700',    bgClass: 'bg-sky-50 border-sky-200' },
-  italienne: { emoji: '🇮🇹', colorClass: 'text-green-700',  bgClass: 'bg-green-50 border-green-200' },
-  française: { emoji: '🇫🇷', colorClass: 'text-blue-700',   bgClass: 'bg-blue-50 border-blue-200' },
+  marocaine: { emoji: '🇲🇦', colorClass: 'text-red-700',     bgClass: 'bg-red-50 border-red-200' },
+  française: { emoji: '🇫🇷', colorClass: 'text-blue-700',    bgClass: 'bg-blue-50 border-blue-200' },
+  italienne: { emoji: '🇮🇹', colorClass: 'text-green-700',   bgClass: 'bg-green-50 border-green-200' },
+  végé:      { emoji: '🥗',   colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200' },
+  rapide:    { emoji: '⚡',   colorClass: 'text-yellow-700',  bgClass: 'bg-yellow-50 border-yellow-200' },
 }
 
-export const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] as const
+export const JOURS = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'] as const
 export const JOURS_LABELS: Record<string, string> = {
-  lundi: 'Lundi', mardi: 'Mardi', mercredi: 'Mercredi',
-  jeudi: 'Jeudi', vendredi: 'Vendredi', samedi: 'Samedi', dimanche: 'Dimanche',
+  lundi:'Lundi', mardi:'Mardi', mercredi:'Mercredi',
+  jeudi:'Jeudi', vendredi:'Vendredi', samedi:'Samedi', dimanche:'Dimanche',
 }
-export const REPAS = ['dejeuner', 'diner'] as const
+export const REPAS  = ['dejeuner','diner'] as const
 export const REPAS_LABELS: Record<string, string> = { dejeuner: '🌞 Déjeuner', diner: '🌙 Dîner' }
 
-export type Jour    = typeof JOURS[number]
-export type Repas   = typeof REPAS[number]
-export type SlotKey = `${Jour}_${Repas}`
+export type Jour  = typeof JOURS[number]
+export type Repas = typeof REPAS[number]
 
-export const ALL_SLOTS: SlotKey[] = JOURS.flatMap(j => REPAS.map(r => `${j}_${r}` as SlotKey))
+export const JOURS_WEEKEND = new Set<string>(['samedi', 'dimanche'])
+
+// Cuisines marocaine et végé : soir + week-end uniquement pour la génération
+export const CUISINES_SOIR_ONLY = new Set<string>(['marocaine'])
+// Cuisines autorisées au déjeuner semaine
+export const CUISINES_MIDI_SEMAINE = ['française', 'italienne', 'rapide', 'végé']
+
+// ─── Saisonnalité ───────────────────────────────────────────────────────────
+
+export const MOIS_ACTUEL = new Date().getMonth() + 1 // 1-12
+export const SAISON_ACTUELLE =
+  MOIS_ACTUEL >= 3 && MOIS_ACTUEL <= 5  ? 'printemps' :
+  MOIS_ACTUEL >= 6 && MOIS_ACTUEL <= 8  ? 'été' :
+  MOIS_ACTUEL >= 9 && MOIS_ACTUEL <= 11 ? 'automne' : 'hiver'
+
+export const SAISON_INGREDIENTS: Record<string, string[]> = {
+  printemps: ['petit pois', 'épinard', 'courgette', 'fraise', 'asperge', 'fève'],
+  été:       ['tomate', 'courgette', 'aubergine', 'poivron', 'concombre', 'melon', 'haricot vert'],
+  automne:   ['potiron', 'courge', 'champignon', 'pomme', 'poire', 'poireau'],
+  hiver:     ['carotte', 'orange', 'clémentine', 'céleri', 'chou', 'endive'],
+}
+
+export function estSaisonnier(r: Recette): boolean {
+  const ings = SAISON_INGREDIENTS[SAISON_ACTUELLE] ?? []
+  const ingStr = r.ingredients.map(i => i.nom).join(' ').toLowerCase()
+  return ings.some(s => ingStr.includes(s) || r.nom.toLowerCase().includes(s))
+    || (r.saison.length > 0 && (r.saison.includes(SAISON_ACTUELLE) || r.saison.includes('toutes')))
+}
+
+// ─── Configuration par slot ─────────────────────────────────────────────────
+
+export type SlotConfig = { maxMin: number; nbPersonnes: number; cuisinesOnly?: string[] }
+
+export function getSlotConfig(jour: string, repas: string): SlotConfig {
+  const isWeekend = JOURS_WEEKEND.has(jour)
+  if (isWeekend)           return { maxMin: 90, nbPersonnes: 6 }
+  if (repas === 'diner')   return { maxMin: 45, nbPersonnes: 6 }
+  if (jour === 'mercredi') return { maxMin: 15, nbPersonnes: 6, cuisinesOnly: CUISINES_MIDI_SEMAINE }
+  return { maxMin: 15, nbPersonnes: 2, cuisinesOnly: CUISINES_MIDI_SEMAINE }
+}
 
 // ─── Dates ─────────────────────────────────────────────────────────────────
 
 export function getMondayOfWeek(date: Date = new Date()): string {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
   return d.toISOString().split('T')[0]
 }
 
@@ -51,183 +88,59 @@ export function formatDateFr(date: Date = new Date()): string {
   return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ─── Temps de préparation ───────────────────────────────────────────────────
+// ─── Astuces & variantes ───────────────────────────────────────────────────
 
-export function parseMinutes(temps: string | null | undefined): number {
-  if (!temps) return 999
-  const hMatch = temps.match(/(\d+)\s*h/i)
-  const mMatch = temps.match(/(\d+)\s*min/i)
-  const numOnly = temps.match(/^(\d+)$/)
-  const h = hMatch ? parseInt(hMatch[1]) : 0
-  const m = mMatch ? parseInt(mMatch[1]) : numOnly ? parseInt(numOnly[1]) : 0
-  const total = h * 60 + m
-  return total === 0 ? 999 : total
+export const ASTUCES: Record<string, string[]> = {
+  marocaine: ['Dorer les épices à sec 1 min avant d\'ajouter les liquides', 'Une pincée de safran dans l\'eau tiède décuple les arômes'],
+  française: ['Déglacer avec un fond de bouillon pour récupérer les sucs', 'Un filet de citron en fin de cuisson rehausse toutes les saveurs'],
+  italienne: ['Saler l\'eau des pâtes généreusement — goût de la mer', 'Garder une louche d\'eau de cuisson pour lier la sauce'],
+  végé:      ['Ajouter les légumes les plus durs en premier', 'Un filet de citron juste avant service préserve la couleur verte'],
+  rapide:    ['Préparer les ingrédients à l\'avance pour gagner du temps', 'Utiliser des restes de la veille pour accélérer'],
+  poulet:    ['Sortir le poulet 20 min avant cuisson pour une chaleur uniforme', 'Piquer la viande avant marinade pour plus de profondeur'],
+  boeuf:     ['Saisir à feu très vif pour une belle croûte', 'Laisser reposer 3 min après cuisson avant de couper'],
+  poisson:   ['Cuire côté peau en premier pour plus de croustillant', 'Ne pas retourner le poisson trop tôt'],
+  vegetarien: ['Les légumineuses doublent les protéines', 'Associer épinards + citron pour une meilleure absorption du fer'],
 }
 
-// ─── Calories ──────────────────────────────────────────────────────────────
-
-export function parseCalories(cal: string | null | undefined): number {
-  if (!cal) return 0
-  const m = String(cal).match(/\d+/)
-  return m ? parseInt(m[0]) : 0
+export const VARIANTES: Record<string, string> = {
+  marocaine: 'Version végé : remplacer la viande par des pois chiches + merguez de volaille',
+  française: 'Adapter avec les légumes de saison disponibles',
+  italienne: 'Remplacer les pâtes par des courgettes spiralisées pour une version légère',
+  végé:      'Ajouter du halloumi grillé pour les amateurs de fromage chaud',
+  rapide:    'En version grande famille : doubler les doses et ajouter du riz',
+  poulet:    'Remplacer par de la dinde pour une version encore plus légère',
+  poisson:   'Utiliser du saumon à la place pour plus de moelleux',
 }
 
-// ─── Sélection aléatoire ───────────────────────────────────────────────────
-
-export function pickRandom<T>(arr: T[], exclude: Set<string> = new Set(), getId: (t: T) => string = (t: unknown) => (t as { id: string }).id): T | null {
-  const available = arr.filter(t => !exclude.has(getId(t)))
-  if (!available.length) return arr[Math.floor(Math.random() * arr.length)] ?? null
-  return available[Math.floor(Math.random() * available.length)]
+export function getAstuces(r: Recette): { astuces: string[]; variante: string | null } {
+  const cuisine = r.cuisine
+  const astuces = (ASTUCES[cuisine] ?? []).slice(0, 2)
+  const variante = VARIANTES[cuisine] ?? null
+  return { astuces, variante }
 }
 
-// ─── Parsing d'ingrédients ─────────────────────────────────────────────────
-// Accepte tout format (string, objet, JSON stringifié, tableau) et retourne
-// toujours une liste propre de { nom, quantite, unite }.
+// ─── Protéines ─────────────────────────────────────────────────────────────
 
-export function parseIngredients(raw: unknown): Array<{ nom: string; quantite: string; unite: string }> {
-  // Normaliser en tableau
-  let items: unknown[]
-  if (raw === null || raw === undefined) return []
-  if (typeof raw === 'string') {
-    const t = (raw as string).trim()
-    if (!t) return []
-    if (t.startsWith('[') || t.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(t)
-        items = Array.isArray(parsed) ? parsed : [parsed]
-      } catch { items = [raw] }
-    } else {
-      items = [raw]
-    }
-  } else if (Array.isArray(raw)) {
-    items = raw
-  } else if (typeof raw === 'object') {
-    items = [raw]
-  } else {
-    return []
-  }
-
-  const seen = new Set<string>()
-  const result: Array<{ nom: string; quantite: string; unite: string }> = []
-
-  for (const item of items) {
-    // Dépaqueter les JSON stringifiés
-    let obj: unknown = item
-    if (typeof item === 'string') {
-      const t = (item as string).trim()
-      if (t.startsWith('{')) {
-        try { obj = JSON.parse(t) } catch { obj = item }
-      }
-    }
-
-    let nom = '', quantite = '', unite = ''
-
-    if (typeof obj === 'string') {
-      nom = (obj as string).trim()
-    } else if (obj && typeof obj === 'object') {
-      const o = obj as Record<string, unknown>
-
-      // Champ raw direct (structure 750g : objet avec raw = texte lisible complet)
-      if (o.raw && String(o.raw).trim().length >= 2) {
-        nom = String(o.raw).trim()
-      } else {
-        const nomCandidate = String(o.nom ?? o.name ?? o.ingredient ?? '').trim()
-        // nom peut lui-même être un JSON stringifié contenant un champ raw
-        if (nomCandidate.startsWith('{')) {
-          try {
-            const inner = JSON.parse(nomCandidate) as Record<string, unknown>
-            nom = String(inner.raw ?? inner.nom ?? inner.name ?? '').trim()
-          } catch { /* ignore, nom reste vide */ }
-        } else {
-          nom      = nomCandidate
-          quantite = String(o.quantite ?? o.quantity ?? o.qte ?? o.amount ?? '').trim()
-          unite    = String(o.unite    ?? o.unit     ?? o.mesure     ?? '').trim()
-        }
-      }
-    }
-
-    // Sanity checks
-    if (!nom || nom.length < 2 || nom.length > 120) continue
-    if (nom.startsWith('{') || nom.startsWith('[')) continue
-    if (/\bicon\b/i.test(nom)) continue
-    if (/^[\d\s.,/]+$/.test(nom)) continue  // chaîne purement numérique
-
-    const key = nom.toLowerCase().replace(/\s+/g, ' ')
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    result.push({ nom, quantite, unite })
-  }
-
-  return result
-}
-
-// ─── Catégorisation ingrédients ────────────────────────────────────────────
-
-const CATEGORIES_KEYWORDS: [string, string[]][] = [
-  ['Légumes', ['tomate', 'carotte', 'oignon', 'poivron', 'courgette', 'aubergine', 'poireau', 'épinard',
-    'salade', 'concombre', 'ail', 'échalote', 'champignon', 'navet', 'haricot vert', 'brocoli', 'chou',
-    'fenouil', 'céleri', 'artichaut', 'asperge', 'radis', 'betterave', 'maïs', 'petit pois', 'potiron',
-    'courge', 'gombo', 'pak choi', 'fenugrec', 'menthe fraîche', 'coriandre fraîche']],
-  ['Viandes & Volailles', ['poulet', 'bœuf', 'veau', 'dinde', 'canard', 'lapin',
-    'kefta', 'steak', 'haché', 'escalope', 'blanc de poulet', 'cuisse', 'côte', 'rôti',
-    'filet de bœuf', 'viande']],
-  ['Poissons', ['saumon', 'thon', 'cabillaud', 'dorade', 'sole', 'merlan', 'truite', 'sardine',
-    'maquereau', 'bar', 'crevette', 'moule', 'calmar', 'anchois']],
-  ['Féculents & Céréales', ['pâtes', 'riz', 'semoule', 'boulgour', 'quinoa', 'lentille', 'pois chiche',
-    'fève', 'haricot blanc', 'haricot rouge', 'farine', 'pain', 'couscous', 'pomme de terre',
-    'patate douce', 'gnocchi', 'polenta', 'orge', 'épeautre']],
-  ['Produits laitiers', ['lait', 'crème', 'beurre', 'fromage', 'yaourt', 'mozzarella', 'gruyère',
-    'parmesan', 'ricotta', 'mascarpone', 'feta', 'emmental', 'cheddar', 'comté', 'labneh']],
-  ['Œufs', ['œuf', 'oeuf']],
-  ['Fruits & Noix', ['pomme', 'poire', 'banane', 'orange', 'citron', 'fraise', 'framboise', 'abricot',
-    'pêche', 'raisin', 'ananas', 'mangue', 'avocat', 'olive', 'datte', 'figue', 'pruneaux',
-    'noix', 'amande', 'noisette', 'pistache', 'cacahuète', 'raisin sec', 'abricots secs']],
-  ['Épices & Aromates', ['sel', 'poivre', 'cumin', 'curcuma', 'gingembre', 'paprika', 'cannelle',
-    'muscade', 'curry', 'ras el hanout', 'harissa', 'safran', 'anis', 'thym', 'romarin', 'basilic',
-    'coriandre', 'persil', 'menthe', 'origan', 'laurier', 'cardamome', 'clou de girofle', 'badiane',
-    'sumac', "za'atar", 'fenugrec']],
-  ['Épicerie & Condiments', ['huile', 'vinaigre', 'moutarde', 'sauce soja', 'sucre', 'miel', 'fécule',
-    'levure', 'bouillon', 'concentré de tomate', 'coulis', 'lait de coco', 'tahini', 'purée',
-    'bicarbonate', 'extrait', 'vanille', 'chocolat', 'cacao', 'sirop']],
+const PROTEINES_MAP = [
+  { mots: ['poulet', 'dinde', 'blanc de poulet'], label: 'poulet' },
+  { mots: ['bœuf', 'boeuf', 'steak', 'viande hachée bœuf'], label: 'boeuf' },
+  { mots: ['haché', 'kefta', 'viande hachée'], label: 'hache' },
+  { mots: ['saumon', 'thon', 'poisson', 'dorade'], label: 'poisson' },
+  { mots: ['pois chiche', 'lentille', 'végé', 'falafel'], label: 'vegetal' },
+  { mots: ['veau'], label: 'veau' },
 ]
 
-export function categoriserIngredient(nom: string): string {
-  const lower = nom.toLowerCase()
-  for (const [cat, keywords] of CATEGORIES_KEYWORDS) {
-    for (const kw of keywords) {
-      if (lower.includes(kw)) return cat
-    }
+export function detecterProteine(nom: string): string {
+  const n = nom.toLowerCase()
+  for (const p of PROTEINES_MAP) {
+    if (p.mots.some(m => n.includes(m))) return p.label
   }
-  return 'Divers'
+  return 'autre'
 }
 
-// ─── Consolidation liste de courses ────────────────────────────────────────
+// ─── Étoiles ───────────────────────────────────────────────────────────────
 
-export function consolidateIngredients(recettesList: Recette[]): ArticleCourses[] {
-  const seen = new Map<string, ArticleCourses>()
-
-  for (const recette of recettesList) {
-    for (const ing of parseIngredients(recette.ingredients)) {
-      const cle = ing.nom.toLowerCase().replace(/\s+/g, ' ')
-      if (!seen.has(cle)) {
-        seen.set(cle, {
-          nom:       ing.nom,
-          quantite:  ing.quantite,
-          unite:     ing.unite,
-          categorie: categoriserIngredient(ing.nom),
-          coche:     false,
-        })
-      }
-    }
-  }
-
-  return Array.from(seen.values()).sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }))
-}
-
-// ─── Affichage étoiles ─────────────────────────────────────────────────────
-
-export function etoiles(score: number): string {
-  const n = Math.round(score)
+export function etoiles(note: number | null): string {
+  const n = Math.round(note ?? 0)
   return '★'.repeat(n) + '☆'.repeat(5 - n)
 }

@@ -1,2 +1,2 @@
-export const VERSION = 'v0.7.0'
-export const VERSION_DATE = '2026-03-19'
+export const VERSION = 'v1.0.0'
+export const VERSION_DATE = '2026-03-20'

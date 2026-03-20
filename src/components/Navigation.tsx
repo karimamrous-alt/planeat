@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const liens = [
-  { href: '/', label: 'Accueil', icone: '🏠' },
-  { href: '/profil', label: 'Profil famille', icone: '👨‍👩‍👧‍👦' },
-  { href: '/menus', label: 'Menus', icone: '📅' },
-  { href: '/courses', label: 'Liste de courses', icone: '🛒' },
-  { href: '/favoris', label: 'Plats favoris', icone: '❤️' },
+  { href: '/',         label: 'Accueil',   icone: '🏠' },
+  { href: '/menus',    label: 'Menus',     icone: '📅' },
+  { href: '/recettes', label: 'Recettes',  icone: '📖' },
+  { href: '/courses',  label: 'Courses',   icone: '🛒' },
+  { href: '/favoris',  label: 'Favoris',   icone: '❤️' },
+  { href: '/profil',   label: 'Profil',    icone: '👨‍👩‍👧‍👦' },
 ]
 
 export default function Navigation() {
@@ -23,36 +24,28 @@ export default function Navigation() {
             <span className="text-xl font-bold text-green-700">PlanEat</span>
           </Link>
           <div className="hidden md:flex items-center gap-1">
-            {liens.map((lien) => (
-              <Link
-                key={lien.href}
-                href={lien.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === lien.href
-                    ? 'bg-green-100 text-green-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+            {liens.map(l => (
+              <Link key={l.href} href={l.href}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === l.href ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                <span>{lien.icone}</span>
-                <span>{lien.label}</span>
+                <span>{l.icone}</span>
+                <span>{l.label}</span>
               </Link>
             ))}
           </div>
         </div>
-        {/* Navigation mobile */}
+        {/* Mobile */}
         <div className="md:hidden flex justify-around pb-2">
-          {liens.map((lien) => (
-            <Link
-              key={lien.href}
-              href={lien.href}
-              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                pathname === lien.href
-                  ? 'text-green-700'
-                  : 'text-gray-500'
+          {liens.map(l => (
+            <Link key={l.href} href={l.href}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium ${
+                pathname === l.href ? 'text-green-700' : 'text-gray-500'
               }`}
             >
-              <span className="text-xl">{lien.icone}</span>
-              <span>{lien.label.split(' ')[0]}</span>
+              <span className="text-lg">{l.icone}</span>
+              <span>{l.label}</span>
             </Link>
           ))}
         </div>
