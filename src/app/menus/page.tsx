@@ -4,10 +4,11 @@ export const runtime = 'edge'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import {
   FAMILLE_ID, getMondayOfWeek, addWeeks, formatSemaine,
-  JOURS, JOURS_LABELS, REPAS, REPAS_LABELS, JOURS_WEEKEND,
+  JOURS, JOURS_LABELS, REPAS, JOURS_WEEKEND,
   CUISINE_CONFIG, CUISINES_SOIR_ONLY, getSlotConfig,
   detecterProteine, estSaisonnier, getAstuces, SAISON_ACTUELLE,
 } from '@/lib/utils'
@@ -390,7 +391,7 @@ export default function Menus() {
                                 <div className="p-1.5 bg-white">
                                   <p className="text-[10px] font-bold leading-tight line-clamp-2" style={{ color: '#2C1810' }}>{rec.nom}</p>
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                    {totalMin(rec) > 0 && <span className="text-[9px]" style={{ color: '#8B5E3C' }}>⏱{totalMin(rec)}'</span>}
+                                    {totalMin(rec) > 0 && <span className="text-[9px]" style={{ color: '#8B5E3C' }}>⏱{totalMin(rec)}&apos;</span>}
                                     <span className="text-[9px]" style={{ color: '#8B5E3C' }}>👤{nbPersonnes}</span>
                                   </div>
                                 </div>
@@ -452,7 +453,7 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
         {/* Photo placeholder */}
         <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl ${cfg.ph}`}>
           {r.photo_url
-            ? <img src={r.photo_url} alt={r.nom} className="w-full h-full object-cover rounded-t-4xl sm:rounded-t-3xl" />
+            ? <Image src={r.photo_url} alt={r.nom} fill className="object-cover rounded-t-4xl sm:rounded-t-3xl" />
             : cfg.emoji
           }
         </div>
