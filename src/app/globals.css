@@ -2,11 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --primary: #15803d; --accent: #f97316; }
+:root {
+  --primary:    #E8622A;
+  --secondary:  #F5A623;
+  --bg-warm:    #FDF6F0;
+  --text-dark:  #2C1810;
+  --text-mid:   #8B5E3C;
+  --season:     #4CAF50;
+  --shadow-card: 0 2px 16px 0 rgba(44,24,16,0.08);
+}
+
 html { color-scheme: light; }
-body { background: #f9fafb; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
-@layer utilities { .text-balance { text-wrap: balance; } }
-@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-.fade-in { animation: fadeIn 0.25s ease-out; }
+
+body {
+  background-color: #FDF6F0;
+  background-image: radial-gradient(circle, rgba(232,98,42,0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: #2C1810;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease-out; }
+
 @keyframes spin-anim { to { transform: rotate(360deg); } }
-.spinner { display:inline-block; width:1.25rem; height:1.25rem; border:2px solid currentColor; border-top-color:transparent; border-radius:9999px; animation:spin-anim 0.7s linear infinite; }
+.spinner {
+  display: inline-block;
+  width: 1.25rem; height: 1.25rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 9999px;
+  animation: spin-anim 0.7s linear infinite;
+}
+
+/* Photo placeholders cuisine */
+.ph-marocaine { background: linear-gradient(135deg,#FED7AA,#FDBA74); }
+.ph-française { background: linear-gradient(135deg,#BFDBFE,#93C5FD); }
+.ph-italienne { background: linear-gradient(135deg,#FECACA,#FCA5A5); }
+.ph-végé      { background: linear-gradient(135deg,#BBF7D0,#86EFAC); }
+.ph-rapide    { background: linear-gradient(135deg,#FDE68A,#FCD34D); }
+.ph-default   { background: linear-gradient(135deg,#E5E7EB,#D1D5DB); }

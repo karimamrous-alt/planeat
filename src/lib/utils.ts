@@ -4,12 +4,12 @@ import type { Recette } from './types'
 
 export const FAMILLE_ID = 'e857128f-7da2-4e00-832e-58169161be40'
 
-export const CUISINE_CONFIG: Record<string, { emoji: string; colorClass: string; bgClass: string }> = {
-  marocaine: { emoji: '🇲🇦', colorClass: 'text-red-700',     bgClass: 'bg-red-50 border-red-200' },
-  française: { emoji: '🇫🇷', colorClass: 'text-blue-700',    bgClass: 'bg-blue-50 border-blue-200' },
-  italienne: { emoji: '🇮🇹', colorClass: 'text-green-700',   bgClass: 'bg-green-50 border-green-200' },
-  végé:      { emoji: '🥗',   colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200' },
-  rapide:    { emoji: '⚡',   colorClass: 'text-yellow-700',  bgClass: 'bg-yellow-50 border-yellow-200' },
+export const CUISINE_CONFIG: Record<string, { emoji: string; colorClass: string; bgClass: string; ph: string }> = {
+  marocaine: { emoji: '🇲🇦', colorClass: 'text-orange-700', bgClass: 'bg-orange-50 border-orange-200', ph: 'ph-marocaine' },
+  française: { emoji: '🇫🇷', colorClass: 'text-blue-700',   bgClass: 'bg-blue-50 border-blue-200',     ph: 'ph-française' },
+  italienne: { emoji: '🇮🇹', colorClass: 'text-red-700',    bgClass: 'bg-red-50 border-red-200',       ph: 'ph-italienne' },
+  végé:      { emoji: '🥗',   colorClass: 'text-green-700',  bgClass: 'bg-green-50 border-green-200',   ph: 'ph-végé'      },
+  rapide:    { emoji: '⚡',   colorClass: 'text-amber-700',  bgClass: 'bg-amber-50 border-amber-200',   ph: 'ph-rapide'    },
 }
 
 export const JOURS = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'] as const
