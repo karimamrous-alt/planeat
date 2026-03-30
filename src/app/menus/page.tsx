@@ -14,6 +14,37 @@ import {
 } from '@/lib/utils'
 import type { Recette, DayMenu } from '@/lib/types'
 
+const FILTER_INGR = /(personne|portion|icon)/i
+function parseIngredients(raw: unknown): string[] {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    if (Array.isArray(obj.recipeRawgredients)) {
+      const result: string[] = []
+      for (const group of obj.recipeRawgredients as Record<string, unknown>[]) {
+        if (Array.isArray(group.ingredients)) {
+          for (const ing of group.ingredients as Record<string, unknown>[]) {
+            const text = String(ing.raw ?? ing.name ?? ing.nom ?? '').trim()
+            if (text && !FILTER_INGR.test(text)) result.push(text)
+          }
+        }
+      }
+      return result
+    }
+  }
+  if (Array.isArray(raw)) {
+    return (raw as unknown[]).flatMap(item => {
+      if (typeof item === 'string') return FILTER_INGR.test(item) ? [] : [item.trim()]
+      if (item && typeof item === 'object') {
+        const i = item as Record<string, unknown>
+        const text = [i.quantite, i.unite, i.nom ?? i.name].filter(Boolean).join('\u00a0').trim()
+        return text && !FILTER_INGR.test(text) ? [text] : []
+      }
+      return []
+    })
+  }
+  return []
+}
+
 // ── Types locaux ──────────────────────────────────────────────────────────────
 
 type Repas = 'dejeuner' | 'diner'
@@ -38,7 +69,7 @@ const MIN_VEG_WEEK = 2
 
 function recetteValide(r: Recette): boolean {
   const n   = r.nom.toLowerCase()
-  const ing = r.ingredients.map(i => i.nom).join(' ').toLowerCase()
+  const ing = parseIngredients(r.ingredients).join(' ').toLowerCase()
   return !MOTS_INTERDITS.some(kw => n.includes(kw) || ing.includes(kw))
 }
 
@@ -448,8 +479,8 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-4xl sm:rounded-3xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto" style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)' }} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-t-4xl sm:rounded-3xl w-full sm:max-w-lg overflow-y-scroll max-h-[90vh]" style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties} onClick={e => e.stopPropagation()}>
         {/* Photo placeholder */}
         <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl ${cfg.ph}`}>
           {r.photo_url
@@ -495,19 +526,19 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
           </div>
 
           {/* Ingrédients */}
-          {r.ingredients.length > 0 && (
+          {(() => { const lignes = parseIngredients(r.ingredients); return lignes.length > 0 && (
             <div className="mb-5">
               <h3 className="font-bold mb-3 text-sm" style={{ color: '#2C1810' }}>Ingrédients</h3>
               <ul className="space-y-1.5">
-                {r.ingredients.map((ing, i) => (
+                {lignes.map((l, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#2C1810' }}>
                     <span className="flex-shrink-0 mt-0.5" style={{ color: '#E8622A' }}>•</span>
-                    <span>{[ing.quantite, ing.unite, ing.nom].filter(Boolean).join('\u00a0')}</span>
+                    <span>{l}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          )}
+          )})()}
 
           {/* Instructions */}
           {r.instructions.length > 0 ? (
