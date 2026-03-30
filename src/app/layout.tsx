@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { Playfair_Display, Nunito } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/Navigation'
+import { VERSION } from '@/lib/version'
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -29,9 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-orange-100 shadow-sm">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-            <span className="font-display text-2xl font-bold" style={{ color: '#E8622A' }}>
-              PlanEat
-            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-2xl font-bold" style={{ color: '#E8622A' }}>PlanEat</span>
+              <span className="text-xs font-semibold" style={{ color: '#C4956A' }}>{VERSION}</span>
+            </div>
             <span className="text-xl">🍽️</span>
           </div>
         </header>
@@ -40,6 +42,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="max-w-2xl mx-auto px-4 py-6 pb-28">
           {children}
         </main>
+
+        {/* Footer */}
+        <footer className="max-w-2xl mx-auto px-4 pb-32 text-center">
+          <p className="text-xs" style={{ color: '#C4956A' }}>PlanEat {VERSION}</p>
+        </footer>
 
         {/* Bottom navigation */}
         <Navigation />
