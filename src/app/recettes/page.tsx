@@ -11,7 +11,7 @@ import type { Recette, Cuisine, TypeRecette, Ingredient } from '@/lib/types'
 
 type IngrForm = { quantite: string; unite: string; nom: string }
 
-const CUISINES: Cuisine[] = ['marocaine', 'française', 'italienne', 'végé', 'rapide']
+const CUISINES: Cuisine[] = ['marocaine', 'française', 'italienne', 'végé', 'rapide', 'indienne']
 const TYPES: TypeRecette[] = ['plat', 'soupe', 'salade']
 const CUISINE_FILTERS = ['toutes', ...CUISINES] as const
 
@@ -57,6 +57,44 @@ function parseOcrText(text: string) {
   }
 }
 
+// ── Parsing ingrédients (formats 750g scraper + manuel) ───────────────────────
+
+const FILTER_INGR = /(personne|portion|icon)/i
+
+function parseIngredients(raw: unknown): string[] {
+  // Format 750g JSON-LD : { recipeRawgredients: [{ ingredients: [{ raw: "..." }] }] }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    if (Array.isArray(obj.recipeRawgredients)) {
+      const result: string[] = []
+      for (const group of obj.recipeRawgredients as Record<string, unknown>[]) {
+        if (Array.isArray(group.ingredients)) {
+          for (const ing of group.ingredients as Record<string, unknown>[]) {
+            const text = String(ing.raw ?? ing.name ?? ing.nom ?? '').trim()
+            if (text && !FILTER_INGR.test(text)) result.push(text)
+          }
+        }
+      }
+      return result
+    }
+  }
+  // Format tableau
+  if (Array.isArray(raw)) {
+    return (raw as unknown[]).flatMap(item => {
+      if (typeof item === 'string') {
+        return FILTER_INGR.test(item) ? [] : [item.trim()]
+      }
+      if (item && typeof item === 'object') {
+        const i = item as Record<string, unknown>
+        const text = [i.quantite, i.unite, i.nom ?? i.name].filter(Boolean).join('\u00a0').trim()
+        return text && !FILTER_INGR.test(text) ? [text] : []
+      }
+      return []
+    })
+  }
+  return []
+}
+
 // ── Carte recette ─────────────────────────────────────────────────────────────
 
 function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
@@ -93,7 +131,7 @@ function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
           {rec.calories > 0 && <span>🔥 {rec.calories}</span>}
         </div>
         <p className="text-xs mt-1.5" style={{ color: '#C4956A' }}>
-          {rec.ingredients.length} ingrédient{rec.ingredients.length > 1 ? 's' : ''}
+          {(() => { const n = parseIngredients(rec.ingredients).length; return `${n} ingrédient${n > 1 ? 's' : ''}` })()}
         </p>
       </div>
     </button>
@@ -108,7 +146,7 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
   const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji: '🍴', colorClass: 'text-gray-600', bgClass: 'bg-gray-50 border-gray-200', ph: 'ph-default' }
   const { astuces, variante } = getAstuces(rec)
   const total = rec.temps_prep + rec.temps_cuisson
-  const lignes = rec.ingredients.map(i => [i.quantite, i.unite, i.nom].filter(Boolean).join('\u00a0'))
+  const lignes = parseIngredients(rec.ingredients)
   const [photoUrl, setPhotoUrl] = useState(rec.photo_url || '')
   useEffect(() => {
     if (!rec.photo_url) {
@@ -117,12 +155,12 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
   }, [rec.id, rec.nom, rec.photo_url])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl flex flex-col max-h-[90vh]"
-        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)' }}
+    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl overflow-y-scroll max-h-[90vh]"
+        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}>
         {/* Photo */}
-        <div className={`h-40 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-5xl flex-shrink-0 relative ${cfg.ph}`}>
+        <div className={`h-40 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-5xl relative ${cfg.ph}`}>
           {photoUrl
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={photoUrl} alt={rec.nom} className="w-full h-full object-cover rounded-t-4xl sm:rounded-t-3xl" />
@@ -135,7 +173,7 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
           </button>
         </div>
 
-        <div className="p-5 border-b flex-shrink-0" style={{ borderColor: '#F0E6DC' }}>
+        <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className={`text-xs font-bold mb-1 ${cfg.colorClass}`}>{cfg.emoji} {rec.cuisine}</p>
@@ -151,7 +189,7 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div>
           {lignes.length > 0 && (
             <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
               <h3 className="font-bold text-sm mb-3" style={{ color: '#2C1810' }}>Ingrédients</h3>
@@ -281,16 +319,16 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl flex flex-col max-h-[92vh]"
-        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)' }}
+    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl overflow-y-scroll max-h-[90vh]"
+        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: '#F0E6DC' }}>
+        <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: '#F0E6DC' }}>
           <h2 className="font-display font-bold text-xl" style={{ color: '#2C1810' }}>Nouvelle recette</h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl">×</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="p-5 space-y-4">
 
           {/* ── OCR Section ── */}
           <div className="rounded-3xl overflow-hidden border-2 border-dashed" style={{ borderColor: '#E8622A' }}>
@@ -434,7 +472,7 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           </div>
         </div>
 
-        <div className="p-4 border-t flex-shrink-0" style={{ borderColor: '#F0E6DC' }}>
+        <div className="p-4 border-t" style={{ borderColor: '#F0E6DC' }}>
           <button onClick={handleSave} disabled={saving || !nom.trim()}
             className="w-full text-white font-bold py-3.5 rounded-full transition-colors disabled:opacity-50"
             style={{ background: '#E8622A' }}
