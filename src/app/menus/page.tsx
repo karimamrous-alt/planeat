@@ -484,8 +484,14 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-4xl sm:rounded-3xl w-full sm:max-w-lg overflow-y-scroll max-h-[90vh]" style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties} onClick={e => e.stopPropagation()}>
+    <div
+      style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Photo placeholder */}
         <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl ${cfg.ph}`}>
           {r.photo_url

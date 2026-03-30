@@ -155,10 +155,14 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
   }, [rec.id, rec.nom, rec.photo_url])
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl overflow-y-scroll max-h-[90vh]"
-        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-        onClick={e => e.stopPropagation()}>
+    <div
+      style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Photo */}
         <div className={`h-40 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-5xl relative ${cfg.ph}`}>
           {photoUrl
@@ -319,10 +323,14 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl overflow-y-scroll max-h-[90vh]"
-        style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-        onClick={e => e.stopPropagation()}>
+    <div
+      style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: '#F0E6DC' }}>
           <h2 className="font-display font-bold text-xl" style={{ color: '#2C1810' }}>Nouvelle recette</h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl">×</button>
