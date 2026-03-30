@@ -59,35 +59,35 @@ function parseOcrText(text: string) {
 
 // ── Parsing ingrédients (formats 750g scraper + manuel) ───────────────────────
 
-const FILTER_INGR = /(personne|portion|icon)/i
-
 function parseIngredients(raw: unknown): string[] {
-  // Format 750g JSON-LD : { recipeRawgredients: [{ ingredients: [{ raw: "..." }] }] }
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+  if (!raw) return []
+  const FILTER = /(personne|portion|icon|serving|weight)/i
+
+  function extraireDepuisGroupe(groupe: Record<string, unknown>): string[] {
+    if (!Array.isArray(groupe.ingredients)) return []
+    return (groupe.ingredients as Record<string, unknown>[])
+      .map(ing => String(ing.raw ?? ing.singular ?? ing.nom ?? ing.name ?? '').trim())
+      .filter(t => t.length > 1 && !FILTER.test(t))
+  }
+
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
     const obj = raw as Record<string, unknown>
     if (Array.isArray(obj.recipeRawgredients)) {
-      const result: string[] = []
-      for (const group of obj.recipeRawgredients as Record<string, unknown>[]) {
-        if (Array.isArray(group.ingredients)) {
-          for (const ing of group.ingredients as Record<string, unknown>[]) {
-            const text = String(ing.raw ?? ing.name ?? ing.nom ?? '').trim()
-            if (text && !FILTER_INGR.test(text)) result.push(text)
-          }
-        }
-      }
-      return result
+      return (obj.recipeRawgredients as Record<string, unknown>[]).flatMap(extraireDepuisGroupe)
+    }
+    if (Array.isArray(obj.ingredients)) {
+      return extraireDepuisGroupe(obj)
     }
   }
-  // Format tableau
+
   if (Array.isArray(raw)) {
     return (raw as unknown[]).flatMap(item => {
-      if (typeof item === 'string') {
-        return FILTER_INGR.test(item) ? [] : [item.trim()]
-      }
+      if (typeof item === 'string') return FILTER.test(item) ? [] : [item.trim()]
       if (item && typeof item === 'object') {
         const i = item as Record<string, unknown>
-        const text = [i.quantite, i.unite, i.nom ?? i.name].filter(Boolean).join('\u00a0').trim()
-        return text && !FILTER_INGR.test(text) ? [text] : []
+        if (Array.isArray(i.ingredients)) return extraireDepuisGroupe(i)
+        const text = String(i.raw ?? i.singular ?? i.nom ?? i.name ?? '').trim()
+        return text && !FILTER.test(text) ? [text] : []
       }
       return []
     })
