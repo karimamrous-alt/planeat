@@ -132,21 +132,26 @@ def transformer_recette(r: dict) -> dict:
     elif cuisine in ("française", "italienne"):
         niveau_epices = "doux"
 
+    def to_int(val, default=0):
+        try:
+            return int(val) if val else default
+        except (ValueError, TypeError):
+            return default
+
     return {
-        "nom":            r.get("nom", "").strip(),
-        "cuisine":        cuisine,
-        "ingredients":    ingredients,
-        "temps_prep":     r.get("temps_preparation", r.get("temps_prep", "")) or "",
-        "temps_cuisson":  r.get("temps_cuisson", "") or "",
-        "temps_total":    r.get("temps_total", "") or "",
-        "calories":       r.get("calories", "") or "",
-        "difficulte":     "moyen",
-        "nb_personnes":   str(r.get("nb_personnes", "")) or "",
-        "score":          0,
-        "nb_votes":       0,
-        "niveau_epices":  niveau_epices,
-        "source_url":     r.get("url", r.get("source_url", "")) or None,
-        "tags":           [],
+        "nom":           r.get("nom", "").strip(),
+        "cuisine":       cuisine,
+        "type":          "plat",
+        "ingredients":   ingredients,
+        "instructions":  r.get("instructions", []) or [],
+        "temps_prep":    to_int(r.get("temps_preparation", r.get("temps_prep"))),
+        "temps_cuisson": to_int(r.get("temps_cuisson")),
+        "calories":      to_int(r.get("calories")),
+        "personnes":     to_int(r.get("nb_personnes", r.get("personnes")), 4),
+        "niveau_epices": niveau_epices,
+        "source":        r.get("url", r.get("source_url", r.get("source"))) or None,
+        "tags":          r.get("tags", []) or [],
+        "saison":        r.get("saison", []) or [],
     }
 
 

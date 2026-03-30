@@ -1,6 +1,6 @@
 // PlanEat v1.0.0 — Types alignés sur le nouveau schéma Supabase
 
-export type Cuisine     = 'marocaine' | 'française' | 'italienne' | 'végé' | 'rapide'
+export type Cuisine     = 'marocaine' | 'française' | 'italienne' | 'végé' | 'rapide' | 'indienne'
 export type TypeRecette = 'plat' | 'soupe' | 'salade'
 export type NiveauEpices = 'doux' | 'moyen' | 'fort'
 

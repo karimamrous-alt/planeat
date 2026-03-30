@@ -10,6 +10,7 @@ export const CUISINE_CONFIG: Record<string, { emoji: string; colorClass: string;
   italienne: { emoji: '🇮🇹', colorClass: 'text-red-700',    bgClass: 'bg-red-50 border-red-200',       ph: 'ph-italienne' },
   végé:      { emoji: '🥗',   colorClass: 'text-green-700',  bgClass: 'bg-green-50 border-green-200',   ph: 'ph-végé'      },
   rapide:    { emoji: '⚡',   colorClass: 'text-amber-700',  bgClass: 'bg-amber-50 border-amber-200',   ph: 'ph-rapide'    },
+  indienne:  { emoji: '🇮🇳', colorClass: 'text-yellow-700', bgClass: 'bg-yellow-50 border-yellow-200', ph: 'ph-indienne'  },
 }
 
 export const JOURS = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'] as const
