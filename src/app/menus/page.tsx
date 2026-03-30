@@ -489,8 +489,9 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
       >
         {/* Photo placeholder */}
         <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl ${cfg.ph}`}>

@@ -160,8 +160,9 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
       >
         {/* Photo */}
         <div className={`h-40 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-5xl relative ${cfg.ph}`}>
@@ -328,8 +329,9 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
       >
         <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: '#F0E6DC' }}>
           <h2 className="font-display font-bold text-xl" style={{ color: '#2C1810' }}>Nouvelle recette</h2>
