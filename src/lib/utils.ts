@@ -45,6 +45,30 @@ export const SAISON_INGREDIENTS: Record<string, string[]> = {
   hiver:     ['carotte', 'orange', 'clémentine', 'céleri', 'chou', 'endive'],
 }
 
+// ─── Unsplash photos ─────────────────────────────────────────────────────────
+
+const _unsplashCache = new Map<string, string>()
+
+export async function getUnsplashPhoto(query: string): Promise<string> {
+  const key = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY ?? ''
+  if (!key || key === 'YOUR_UNSPLASH_KEY') return ''
+  const cacheKey = query.toLowerCase().slice(0, 60)
+  if (_unsplashCache.has(cacheKey)) return _unsplashCache.get(cacheKey)!
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${key}`,
+      { next: { revalidate: 86400 } }   // cache CDN 24h
+    )
+    if (!res.ok) return ''
+    const data = await res.json()
+    const url: string = data.results?.[0]?.urls?.small ?? ''
+    _unsplashCache.set(cacheKey, url)
+    return url
+  } catch {
+    return ''
+  }
+}
+
 export function estSaisonnier(r: Recette): boolean {
   const ings = SAISON_INGREDIENTS[SAISON_ACTUELLE] ?? []
   const ingStr = r.ingredients.map(i => i.nom).join(' ').toLowerCase()

@@ -135,7 +135,7 @@ export default function Accueil() {
               if (!rec) return null
               const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-600', ph: 'ph-default' }
               return (
-                <div key={repas} className={`rounded-2xl border p-4 flex gap-3 items-center ${cfg.bgClass}`}>
+                <Link key={repas} href="/menus" className={`rounded-2xl border p-4 flex gap-3 items-center transition-opacity hover:opacity-80 active:opacity-60 ${cfg.bgClass}`}>
                   {/* Photo placeholder */}
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 ${cfg.ph}`}>
                     {cfg.emoji}
@@ -148,7 +148,8 @@ export default function Accueil() {
                       {rec.calories > 0 && <span className="text-xs" style={{ color: '#8B5E3C' }}>· {rec.calories} kcal</span>}
                     </div>
                   </div>
-                </div>
+                  <span className="text-lg flex-shrink-0" style={{ color: '#C4956A' }}>›</span>
+                </Link>
               )
             })}
           </div>

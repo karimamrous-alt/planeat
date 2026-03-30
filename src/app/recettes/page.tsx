@@ -4,7 +4,7 @@ export const runtime = 'edge'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { FAMILLE_ID, CUISINE_CONFIG, getAstuces, estSaisonnier } from '@/lib/utils'
+import { FAMILLE_ID, CUISINE_CONFIG, getAstuces, estSaisonnier, getUnsplashPhoto } from '@/lib/utils'
 import type { Recette, Cuisine, TypeRecette, Ingredient } from '@/lib/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -62,16 +62,22 @@ function parseOcrText(text: string) {
 function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
   const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji: '🍴', colorClass: 'text-gray-600', bgClass: 'bg-gray-50 border-gray-200', ph: 'ph-default' }
   const total = rec.temps_prep + rec.temps_cuisson
+  const [photoUrl, setPhotoUrl] = useState(rec.photo_url || '')
+  useEffect(() => {
+    if (!rec.photo_url) {
+      getUnsplashPhoto(rec.nom).then(url => { if (url) setPhotoUrl(url) })
+    }
+  }, [rec.id, rec.nom, rec.photo_url])
   return (
     <button onClick={onClick}
       className="text-left bg-white rounded-3xl overflow-hidden transition-all hover:shadow-card-lg hover:scale-[1.01] active:scale-[0.99] w-full"
       style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}
     >
-      {/* Photo placeholder */}
+      {/* Photo */}
       <div className={`h-24 flex items-center justify-center text-4xl relative ${cfg.ph}`}>
-        {rec.photo_url
+        {photoUrl
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={rec.photo_url} alt={rec.nom} className="w-full h-full object-cover" />
+          ? <img src={photoUrl} alt={rec.nom} className="w-full h-full object-cover" />
           : cfg.emoji
         }
         {estSaisonnier(rec) && (
@@ -103,17 +109,23 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
   const { astuces, variante } = getAstuces(rec)
   const total = rec.temps_prep + rec.temps_cuisson
   const lignes = rec.ingredients.map(i => [i.quantite, i.unite, i.nom].filter(Boolean).join('\u00a0'))
+  const [photoUrl, setPhotoUrl] = useState(rec.photo_url || '')
+  useEffect(() => {
+    if (!rec.photo_url) {
+      getUnsplashPhoto(rec.nom).then(url => { if (url) setPhotoUrl(url) })
+    }
+  }, [rec.id, rec.nom, rec.photo_url])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4" onClick={onClose}>
       <div className="bg-white w-full sm:max-w-lg rounded-t-4xl sm:rounded-3xl flex flex-col max-h-[90vh]"
         style={{ boxShadow: '0 8px 32px rgba(44,24,16,0.2)' }}
         onClick={e => e.stopPropagation()}>
-        {/* Photo placeholder */}
+        {/* Photo */}
         <div className={`h-40 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-5xl flex-shrink-0 relative ${cfg.ph}`}>
-          {rec.photo_url
+          {photoUrl
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={rec.photo_url} alt={rec.nom} className="w-full h-full object-cover rounded-t-4xl sm:rounded-t-3xl" />
+            ? <img src={photoUrl} alt={rec.nom} className="w-full h-full object-cover rounded-t-4xl sm:rounded-t-3xl" />
             : cfg.emoji
           }
           <button onClick={onToggleFavori}
@@ -139,7 +151,7 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {lignes.length > 0 && (
             <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
               <h3 className="font-bold text-sm mb-3" style={{ color: '#2C1810' }}>Ingrédients</h3>

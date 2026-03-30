@@ -30,14 +30,16 @@ CATEGORIES = {
     "afghane":    "https://www.750g.com/recettes_cuisine_afghane.htm",
     "italienne":  "https://www.750g.com/recettes_cuisine_italienne.htm",
     "française":  "https://www.750g.com/recettes_cuisine_francaise.htm",
+    "végé":       "https://www.750g.com/recettes_vegetariennes.htm",
 }
 
 MAX_PAGES_PAR_CATEGORIE = {
-    "marocaine": 15,
-    "indienne":  10,
+    "marocaine": 20,
+    "indienne":  12,
     "afghane":    5,
-    "italienne": 15,
-    "française": 10,
+    "italienne": 20,
+    "française": 15,
+    "végé":      10,
 }
 DELAI_ENTRE_REQUETES = 3.0  # secondes — respecter le serveur
 OUTPUT_FILE = Path(__file__).parent / "recettes.json"
