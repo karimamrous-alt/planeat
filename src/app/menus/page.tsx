@@ -290,34 +290,34 @@ export default function Menus() {
 
       {/* En-tête */}
       <div>
-        <h1 className="font-display text-2xl font-bold" style={{ color: '#2C1810' }}>
+        <h1 className="font-display text-2xl font-bold" style={{ color: '#FFFFFF' }}>
           📅 Menus de la semaine
         </h1>
-        <p className="text-sm mt-0.5" style={{ color: '#8B5E3C' }}>
+        <p className="text-sm mt-0.5" style={{ color: '#9A9A9A' }}>
           {SAISON_ACTUELLE === 'printemps' ? '🌸' : SAISON_ACTUELLE === 'été' ? '☀️' : SAISON_ACTUELLE === 'automne' ? '🍂' : '❄️'} {SAISON_ACTUELLE.charAt(0).toUpperCase() + SAISON_ACTUELLE.slice(1)} · {nbFilled}/14 repas
         </p>
       </div>
 
       {/* Navigation semaine */}
-      <div className="bg-white rounded-3xl px-4 py-3 flex items-center justify-between" style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}>
+      <div className="rounded-3xl px-4 py-3 flex items-center justify-between" style={{ background: '#1C1C1C', boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
         <button
           onClick={() => setSemaine(s => addWeeks(s, -1))}
           className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg transition-colors"
-          style={{ background: '#FDF6F0', color: '#E8622A' }}
+          style={{ background: '#2A2A2A', color: '#C8440A' }}
         >‹</button>
-        <span className="text-sm font-bold" style={{ color: '#2C1810' }}>
+        <span className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
           Semaine du {formatSemaine(semaine)}
         </span>
         <button
           onClick={() => setSemaine(s => addWeeks(s, 1))}
           className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg transition-colors"
-          style={{ background: '#FDF6F0', color: '#E8622A' }}
+          style={{ background: '#2A2A2A', color: '#C8440A' }}
         >›</button>
       </div>
 
       {/* Structure repas */}
-      <div className="bg-white rounded-3xl p-4" style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}>
-        <p className="text-sm font-bold mb-3" style={{ color: '#2C1810' }}>Structure du repas</p>
+      <div className="rounded-3xl p-4" style={{ background: '#1C1C1C', boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
+        <p className="text-sm font-bold mb-3" style={{ color: '#FFFFFF' }}>Structure du repas</p>
         <div className="flex flex-wrap gap-2">
           {[
             { v: 'plat',                l: 'Plat seul' },
@@ -328,8 +328,8 @@ export default function Menus() {
             <button key={s.v} onClick={() => setStructure(s.v as Structure)}
               className="px-4 py-2 rounded-full text-xs font-bold border transition-all"
               style={structure === s.v
-                ? { background: '#E8622A', color: '#fff', borderColor: '#E8622A' }
-                : { background: '#FDF6F0', color: '#8B5E3C', borderColor: '#F0E6DC' }
+                ? { background: '#C8440A', color: '#fff', borderColor: '#C8440A' }
+                : { background: '#2A2A2A', color: '#9A9A9A', borderColor: '#333333' }
               }
             >{s.l}</button>
           ))}
@@ -340,13 +340,13 @@ export default function Menus() {
       <div className="flex flex-wrap gap-3 items-center">
         <button onClick={genererTout} disabled={generating || !pool.length}
           className="inline-flex items-center gap-2 text-white font-bold px-5 py-2.5 rounded-full transition-colors disabled:opacity-50"
-          style={{ background: '#E8622A' }}
+          style={{ background: '#C8440A' }}
         >
           {generating ? <span className="spinner" /> : '✨'} Générer tout
         </button>
         <button onClick={valider} disabled={saving || nbFilled === 0}
           className="inline-flex items-center gap-2 text-white font-bold px-5 py-2.5 rounded-full transition-colors disabled:opacity-50"
-          style={{ background: '#F5A623' }}
+          style={{ background: '#EF9F27' }}
         >
           {saving ? <span className="spinner" /> : savedOk ? '✅' : '💾'}
           {savedOk ? 'Sauvegardé !' : 'Valider'}
@@ -354,7 +354,7 @@ export default function Menus() {
         {menuId && (
           <Link href="/courses"
             className="inline-flex items-center gap-2 font-semibold px-5 py-2.5 rounded-full border transition-colors"
-            style={{ color: '#E8622A', borderColor: '#E8622A', background: 'rgba(232,98,42,0.06)' }}
+            style={{ color: '#C8440A', borderColor: '#C8440A', background: 'rgba(200,68,10,0.1)' }}
           >
             🛒 Courses
           </Link>
@@ -364,7 +364,7 @@ export default function Menus() {
       {/* Grille planning */}
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="spinner" style={{ color: '#E8622A' }} />
+          <div className="spinner" style={{ color: '#C8440A' }} />
         </div>
       ) : (
         <div className="overflow-x-auto scrollbar-hide">
@@ -378,13 +378,13 @@ export default function Menus() {
                 const isWE = JOURS_WEEKEND.has(jour)
                 return (
                   <div key={jour} className="text-center">
-                    <p className={`text-[11px] font-bold uppercase tracking-wide ${isWE ? '' : ''}`}
-                      style={{ color: isWE ? '#E8622A' : '#8B5E3C' }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wide"
+                      style={{ color: isWE ? '#C8440A' : '#9A9A9A' }}>
                       {JOURS_LABELS[jour].slice(0, 3)}
                     </p>
                     {dot
-                      ? <p className="text-[9px]">{dot} {calJour}</p>
-                      : isWE && <p className="text-[9px]" style={{ color: '#F5A623' }}>W-E</p>
+                      ? <p className="text-[9px]" style={{ color: '#9A9A9A' }}>{dot} {calJour}</p>
+                      : isWE && <p className="text-[9px]" style={{ color: '#EF9F27' }}>W-E</p>
                     }
                   </div>
                 )
@@ -395,7 +395,7 @@ export default function Menus() {
             {(['dejeuner', 'diner'] as const).map(repas => (
               <div key={repas} className="grid grid-cols-8 gap-1.5 mb-2">
                 <div className="flex items-center">
-                  <span className="text-[10px] font-bold" style={{ color: '#8B5E3C' }}>
+                  <span className="text-[10px] font-bold" style={{ color: '#9A9A9A' }}>
                     {repas === 'dejeuner' ? '🌞' : '🌙'}
                   </span>
                 </div>
@@ -409,26 +409,25 @@ export default function Menus() {
                           <button
                             onClick={() => regenererSlot(jour, repas)}
                             title="Régénérer"
-                            className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
-                            style={{ border: '1.5px solid #E8622A', color: '#E8622A' }}
+                            className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full shadow flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
+                            style={{ background: '#2A2A2A', border: '1.5px solid #C8440A', color: '#C8440A' }}
                           >↻</button>
                           {(() => {
                             const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-500', ph: 'ph-default' }
                             return (
                               <div
-                                className="rounded-xl border cursor-pointer hover:brightness-95 transition-all overflow-hidden"
-                                style={{ borderColor: 'transparent', boxShadow: '0 1px 6px rgba(44,24,16,0.10)' }}
+                                className="rounded-xl border cursor-pointer hover:brightness-110 transition-all overflow-hidden"
+                                style={{ borderColor: '#333333', boxShadow: '0 1px 6px rgba(0,0,0,0.3)' }}
                                 onClick={() => setModal(rec)}
                               >
-                                {/* Mini photo placeholder */}
                                 <div className={`h-8 flex items-center justify-center text-base ${cfg.ph}`}>
                                   {cfg.emoji}{estSaisonnier(rec) ? '🌱' : ''}
                                 </div>
-                                <div className="p-1.5 bg-white">
-                                  <p className="text-[10px] font-bold leading-tight line-clamp-2" style={{ color: '#2C1810' }}>{rec.nom}</p>
+                                <div className="p-1.5" style={{ background: '#1C1C1C' }}>
+                                  <p className="text-[10px] font-bold leading-tight line-clamp-2" style={{ color: '#FFFFFF' }}>{rec.nom}</p>
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                    {totalMin(rec) > 0 && <span className="text-[9px]" style={{ color: '#8B5E3C' }}>⏱{totalMin(rec)}&apos;</span>}
-                                    <span className="text-[9px]" style={{ color: '#8B5E3C' }}>👤{nbPersonnes}</span>
+                                    {totalMin(rec) > 0 && <span className="text-[9px]" style={{ color: '#9A9A9A' }}>⏱{totalMin(rec)}&apos;</span>}
+                                    <span className="text-[9px]" style={{ color: '#9A9A9A' }}>👤{nbPersonnes}</span>
                                   </div>
                                 </div>
                               </div>
@@ -439,9 +438,9 @@ export default function Menus() {
                         <button
                           onClick={() => regenererSlot(jour, repas)}
                           className="w-full min-h-[72px] rounded-xl border-2 border-dashed text-xs flex items-center justify-center transition-colors"
-                          style={{ borderColor: '#F0E6DC', color: '#C4956A' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#E8622A'; (e.currentTarget as HTMLElement).style.color = '#E8622A' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#F0E6DC'; (e.currentTarget as HTMLElement).style.color = '#C4956A' }}
+                          style={{ borderColor: '#333333', color: '#9A9A9A' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#C8440A'; (e.currentTarget as HTMLElement).style.color = '#C8440A' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#333333'; (e.currentTarget as HTMLElement).style.color = '#9A9A9A' }}
                         >+</button>
                       )}
                     </div>
@@ -454,12 +453,12 @@ export default function Menus() {
       )}
 
       {!loading && nbFilled === 0 && pool.length > 0 && (
-        <div className="text-center py-10 bg-white rounded-4xl" style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}>
+        <div className="text-center py-10 rounded-3xl" style={{ background: '#1C1C1C', boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
           <p className="text-4xl mb-3">🍽️</p>
-          <p className="text-sm mb-5" style={{ color: '#8B5E3C' }}>Aucun menu généré pour cette semaine.</p>
+          <p className="text-sm mb-5" style={{ color: '#9A9A9A' }}>Aucun menu généré pour cette semaine.</p>
           <button onClick={genererTout}
             className="inline-flex items-center gap-2 text-white font-bold px-6 py-3 rounded-full"
-            style={{ background: '#E8622A' }}
+            style={{ background: '#C8440A' }}
           >
             ✨ Générer le menu
           </button>
@@ -489,7 +488,7 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
@@ -498,7 +497,7 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
     >
       <div
         style={{
-          backgroundColor: '#fff',
+          backgroundColor: '#1C1C1C',
           borderRadius: '24px 24px 0 0',
           width: '100%',
           maxWidth: '640px',
@@ -511,7 +510,7 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
         onClick={e => e.stopPropagation()}
       >
         {/* Photo placeholder */}
-        <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl ${cfg.ph}`}>
+        <div className={`h-44 rounded-t-4xl sm:rounded-t-3xl flex items-center justify-center text-6xl relative ${cfg.ph}`}>
           {r.photo_url
             ? <Image src={r.photo_url} alt={r.nom} fill className="object-cover rounded-t-4xl sm:rounded-t-3xl" />
             : cfg.emoji
@@ -521,34 +520,34 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
         <div className="p-6">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 pr-3">
-              <h2 className="font-display text-xl font-bold leading-tight" style={{ color: '#2C1810' }}>{r.nom}</h2>
+              <h2 className="font-display text-xl font-bold leading-tight" style={{ color: '#FFFFFF' }}>{r.nom}</h2>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full border ${cfg.bgClass} ${cfg.colorClass}`}>
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full border" style={{ background: '#2A2A2A', color: '#EF9F27', borderColor: '#333333' }}>
                   {cfg.emoji} {r.cuisine}
                 </span>
                 {estSaisonnier(r) && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-full border" style={{ background: '#F0FDF4', color: '#4CAF50', borderColor: '#BBF7D0' }}>
+                  <span className="text-xs font-bold px-3 py-1 rounded-full border" style={{ background: '#14532D', color: '#4ADE80', borderColor: '#166534' }}>
                     🌱 De saison
                   </span>
                 )}
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl leading-none flex-shrink-0">×</button>
+            <button onClick={onClose} className="text-2xl leading-none flex-shrink-0" style={{ color: '#9A9A9A' }}>×</button>
           </div>
 
           {/* Méta */}
           <div className="flex flex-wrap gap-2 mb-5">
             {totalMin(r) > 0 && (
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#FDF6F0', color: '#8B5E3C' }}>⏱ {totalMin(r)} min</span>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#2A2A2A', color: '#9A9A9A' }}>⏱ {totalMin(r)} min</span>
             )}
             {r.personnes > 0 && (
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#FDF6F0', color: '#8B5E3C' }}>👤 {r.personnes} pers.</span>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#2A2A2A', color: '#9A9A9A' }}>👤 {r.personnes} pers.</span>
             )}
             {r.calories > 0 && (
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#FDF6F0', color: '#8B5E3C' }}>🔥 {r.calories} kcal</span>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: '#2A2A2A', color: '#9A9A9A' }}>🔥 {r.calories} kcal</span>
             )}
             {r.niveau_epices && r.niveau_epices !== 'doux' && (
-              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${r.niveau_epices === 'fort' ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={r.niveau_epices === 'fort' ? { background: '#7F1D1D', color: '#FCA5A5' } : { background: '#78350F', color: '#FCD34D' }}>
                 🌶 {r.niveau_epices}
               </span>
             )}
@@ -557,11 +556,11 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
           {/* Ingrédients */}
           {(() => { const lignes = parseIngredients(r.ingredients); return lignes.length > 0 && (
             <div className="mb-5">
-              <h3 className="font-bold mb-3 text-sm" style={{ color: '#2C1810' }}>Ingrédients</h3>
+              <h3 className="font-bold mb-3 text-sm" style={{ color: '#FFFFFF' }}>Ingrédients</h3>
               <ul className="space-y-1.5">
                 {lignes.map((l, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#2C1810' }}>
-                    <span className="flex-shrink-0 mt-0.5" style={{ color: '#E8622A' }}>•</span>
+                  <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#FFFFFF' }}>
+                    <span className="flex-shrink-0 mt-0.5" style={{ color: '#C8440A' }}>•</span>
                     <span>{l}</span>
                   </li>
                 ))}
@@ -572,29 +571,29 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
           {/* Instructions */}
           {r.instructions.length > 0 ? (
             <div className="mb-5">
-              <h3 className="font-bold mb-3 text-sm" style={{ color: '#2C1810' }}>Préparation</h3>
+              <h3 className="font-bold mb-3 text-sm" style={{ color: '#FFFFFF' }}>Préparation</h3>
               <ol className="space-y-3">
                 {r.instructions.map((etape, i) => (
-                  <li key={i} className="flex gap-3 text-sm" style={{ color: '#2C1810' }}>
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold" style={{ background: '#E8622A' }}>{i + 1}</span>
+                  <li key={i} className="flex gap-3 text-sm" style={{ color: '#FFFFFF' }}>
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold" style={{ background: '#C8440A' }}>{i + 1}</span>
                     <span className="leading-relaxed pt-0.5">{etape}</span>
                   </li>
                 ))}
               </ol>
             </div>
           ) : (
-            <p className="text-sm italic mb-5" style={{ color: '#8B5E3C' }}>Instructions non disponibles.</p>
+            <p className="text-sm italic mb-5" style={{ color: '#9A9A9A' }}>Instructions non disponibles.</p>
           )}
 
           {/* Astuces */}
           {(astuces.length > 0 || variante) && (
-            <div className="rounded-2xl p-4 space-y-3" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+            <div className="rounded-2xl p-4 space-y-3" style={{ background: '#2A2A2A', border: '1px solid #333333' }}>
               {astuces.length > 0 && (
                 <div>
-                  <h3 className="font-bold mb-2 text-sm" style={{ color: '#92400E' }}>💡 Astuces</h3>
+                  <h3 className="font-bold mb-2 text-sm" style={{ color: '#EF9F27' }}>💡 Astuces</h3>
                   <ul className="space-y-1">
                     {astuces.map((tip, i) => (
-                      <li key={i} className="text-xs flex gap-2" style={{ color: '#B45309' }}>
+                      <li key={i} className="text-xs flex gap-2" style={{ color: '#9A9A9A' }}>
                         <span className="flex-shrink-0">•</span><span>{tip}</span>
                       </li>
                     ))}
@@ -603,8 +602,8 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
               )}
               {variante && (
                 <div>
-                  <h3 className="font-bold mb-1 text-sm" style={{ color: '#92400E' }}>🔄 Variante</h3>
-                  <p className="text-xs" style={{ color: '#B45309' }}>{variante}</p>
+                  <h3 className="font-bold mb-1 text-sm" style={{ color: '#EF9F27' }}>🔄 Variante</h3>
+                  <p className="text-xs" style={{ color: '#9A9A9A' }}>{variante}</p>
                 </div>
               )}
             </div>

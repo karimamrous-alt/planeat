@@ -108,8 +108,8 @@ function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
   }, [rec.id, rec.nom, rec.photo_url])
   return (
     <button onClick={onClick}
-      className="text-left bg-white rounded-3xl overflow-hidden transition-all hover:shadow-card-lg hover:scale-[1.01] active:scale-[0.99] w-full"
-      style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}
+      className="text-left rounded-3xl overflow-hidden transition-all hover:brightness-110 active:scale-[0.99] w-full"
+      style={{ background: '#1C1C1C', boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}
     >
       {/* Photo */}
       <div className={`h-24 flex items-center justify-center text-4xl relative ${cfg.ph}`}>
@@ -119,18 +119,18 @@ function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
           : cfg.emoji
         }
         {estSaisonnier(rec) && (
-          <span className="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#4CAF50', color: '#fff' }}>🌱</span>
+          <span className="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#15803D', color: '#fff' }}>🌱</span>
         )}
       </div>
       <div className="p-3">
-        <p className={`text-xs font-bold mb-1 ${cfg.colorClass}`}>{cfg.emoji} {rec.cuisine}</p>
-        <p className="font-bold text-sm leading-snug line-clamp-2" style={{ color: '#2C1810' }}>{rec.nom}</p>
-        <div className="flex flex-wrap gap-2 mt-1.5 text-xs" style={{ color: '#8B5E3C' }}>
+        <p className="text-xs font-bold mb-1" style={{ color: '#EF9F27' }}>{cfg.emoji} {rec.cuisine}</p>
+        <p className="font-bold text-sm leading-snug line-clamp-2" style={{ color: '#FFFFFF' }}>{rec.nom}</p>
+        <div className="flex flex-wrap gap-2 mt-1.5 text-xs" style={{ color: '#9A9A9A' }}>
           {total > 0 && <span>⏱ {total} min</span>}
           {rec.personnes > 0 && <span>👤 {rec.personnes}</span>}
           {rec.calories > 0 && <span>🔥 {rec.calories}</span>}
         </div>
-        <p className="text-xs mt-1.5" style={{ color: '#C4956A' }}>
+        <p className="text-xs mt-1.5" style={{ color: '#9A9A9A' }}>
           {(() => { const n = parseIngredients(rec.ingredients).length; return `${n} ingrédient${n > 1 ? 's' : ''}` })()}
         </p>
       </div>
@@ -156,11 +156,11 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
 
   return (
     <div
-      style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}
+      style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'flex-end' }}
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        style={{ background:'#1C1C1C', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}
         onTouchMove={e => e.stopPropagation()}
       >
@@ -172,36 +172,37 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
             : cfg.emoji
           }
           <button onClick={onToggleFavori}
-            className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-xl shadow"
+            className="absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow"
+            style={{ background: 'rgba(28,28,28,0.85)' }}
           >
             {isFavori ? '❤️' : '🤍'}
           </button>
         </div>
 
-        <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
+        <div className="p-5 border-b" style={{ borderColor: '#333333' }}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className={`text-xs font-bold mb-1 ${cfg.colorClass}`}>{cfg.emoji} {rec.cuisine}</p>
-              <h2 className="font-display font-bold text-xl leading-tight" style={{ color: '#2C1810' }}>{rec.nom}</h2>
-              <div className="flex flex-wrap gap-2 mt-2 text-xs" style={{ color: '#8B5E3C' }}>
+              <p className="text-xs font-bold mb-1" style={{ color: '#EF9F27' }}>{cfg.emoji} {rec.cuisine}</p>
+              <h2 className="font-display font-bold text-xl leading-tight" style={{ color: '#FFFFFF' }}>{rec.nom}</h2>
+              <div className="flex flex-wrap gap-2 mt-2 text-xs" style={{ color: '#9A9A9A' }}>
                 {total > 0 && <span>⏱ {total} min</span>}
                 {rec.personnes > 0 && <span>👤 {rec.personnes} pers.</span>}
                 {rec.calories > 0 && <span>🔥 {rec.calories} kcal</span>}
-                {estSaisonnier(rec) && <span style={{ color: '#4CAF50' }}>🌱 De saison</span>}
+                {estSaisonnier(rec) && <span style={{ color: '#4ADE80' }}>🌱 De saison</span>}
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl flex-shrink-0 mt-1">×</button>
+            <button onClick={onClose} className="text-2xl flex-shrink-0 mt-1" style={{ color: '#9A9A9A' }}>×</button>
           </div>
         </div>
 
         <div>
           {lignes.length > 0 && (
-            <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
-              <h3 className="font-bold text-sm mb-3" style={{ color: '#2C1810' }}>Ingrédients</h3>
+            <div className="p-5 border-b" style={{ borderColor: '#333333' }}>
+              <h3 className="font-bold text-sm mb-3" style={{ color: '#FFFFFF' }}>Ingrédients</h3>
               <ul className="space-y-1.5">
                 {lignes.map((l, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#2C1810' }}>
-                    <span className="flex-shrink-0 mt-0.5" style={{ color: '#E8622A' }}>•</span>
+                  <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#FFFFFF' }}>
+                    <span className="flex-shrink-0 mt-0.5" style={{ color: '#C8440A' }}>•</span>
                     <span>{l}</span>
                   </li>
                 ))}
@@ -210,12 +211,12 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
           )}
 
           {rec.instructions.length > 0 && (
-            <div className="p-5 border-b" style={{ borderColor: '#F0E6DC' }}>
-              <h3 className="font-bold text-sm mb-3" style={{ color: '#2C1810' }}>Préparation</h3>
+            <div className="p-5 border-b" style={{ borderColor: '#333333' }}>
+              <h3 className="font-bold text-sm mb-3" style={{ color: '#FFFFFF' }}>Préparation</h3>
               <ol className="space-y-2">
                 {rec.instructions.map((step, i) => (
-                  <li key={i} className="flex gap-3 text-sm" style={{ color: '#2C1810' }}>
-                    <span className="w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ background: '#E8622A' }}>{i + 1}</span>
+                  <li key={i} className="flex gap-3 text-sm" style={{ color: '#FFFFFF' }}>
+                    <span className="w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ background: '#C8440A' }}>{i + 1}</span>
                     <span>{step}</span>
                   </li>
                 ))}
@@ -227,16 +228,16 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
             <div className="p-5">
               {astuces.length > 0 && (
                 <div className="mb-3">
-                  <h3 className="font-bold text-sm mb-2" style={{ color: '#92400E' }}>💡 Astuces</h3>
+                  <h3 className="font-bold text-sm mb-2" style={{ color: '#EF9F27' }}>💡 Astuces</h3>
                   {astuces.map((a, i) => (
-                    <p key={i} className="text-xs mb-1" style={{ color: '#B45309' }}>→ {a}</p>
+                    <p key={i} className="text-xs mb-1" style={{ color: '#9A9A9A' }}>→ {a}</p>
                   ))}
                 </div>
               )}
               {variante && (
                 <div>
-                  <h3 className="font-bold text-sm mb-1" style={{ color: '#92400E' }}>🔄 Variante</h3>
-                  <p className="text-xs" style={{ color: '#B45309' }}>{variante}</p>
+                  <h3 className="font-bold text-sm mb-1" style={{ color: '#EF9F27' }}>🔄 Variante</h3>
+                  <p className="text-xs" style={{ color: '#9A9A9A' }}>{variante}</p>
                 </div>
               )}
             </div>
@@ -280,7 +281,6 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Preview
     const url = URL.createObjectURL(file)
     setPreview(url)
     setOcrLoading(true)
@@ -323,30 +323,33 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
     onClose()
   }
 
+  const inputStyle = { borderColor: '#333333', background: '#2A2A2A', color: '#FFFFFF' }
+  const labelStyle = { color: '#9A9A9A' }
+
   return (
     <div
-      style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}
+      style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'flex-end' }}
       onClick={onClose}
     >
       <div
-        style={{ background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
+        style={{ background:'#1C1C1C', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', paddingBottom:'env(safe-area-inset-bottom)' } as React.CSSProperties}
         onClick={e => e.stopPropagation()}
         onTouchMove={e => e.stopPropagation()}
       >
-        <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: '#F0E6DC' }}>
-          <h2 className="font-display font-bold text-xl" style={{ color: '#2C1810' }}>Nouvelle recette</h2>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-2xl">×</button>
+        <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: '#333333' }}>
+          <h2 className="font-display font-bold text-xl" style={{ color: '#FFFFFF' }}>Nouvelle recette</h2>
+          <button onClick={onClose} className="text-2xl" style={{ color: '#9A9A9A' }}>×</button>
         </div>
 
         <div className="p-5 space-y-4">
 
           {/* ── OCR Section ── */}
-          <div className="rounded-3xl overflow-hidden border-2 border-dashed" style={{ borderColor: '#E8622A' }}>
+          <div className="rounded-3xl overflow-hidden border-2 border-dashed" style={{ borderColor: '#C8440A' }}>
             {preview ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview} alt="Aperçu" className="w-full h-40 object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
                   {ocrLoading ? (
                     <div className="text-center text-white">
                       <div className="spinner mx-auto mb-2" />
@@ -368,8 +371,8 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
                 className="w-full p-5 flex flex-col items-center gap-2"
               >
                 <span className="text-4xl">📸</span>
-                <p className="font-bold text-sm" style={{ color: '#E8622A' }}>Prendre une photo ou importer</p>
-                <p className="text-xs" style={{ color: '#8B5E3C' }}>Le texte sera extrait automatiquement</p>
+                <p className="font-bold text-sm" style={{ color: '#C8440A' }}>Prendre une photo ou importer</p>
+                <p className="text-xs" style={{ color: '#9A9A9A' }}>Le texte sera extrait automatiquement</p>
               </button>
             )}
             <input
@@ -384,30 +387,30 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
 
           {/* Nom */}
           <div>
-            <label className="block text-xs font-bold mb-1" style={{ color: '#8B5E3C' }}>Nom de la recette *</label>
+            <label className="block text-xs font-bold mb-1" style={labelStyle}>Nom de la recette *</label>
             <input value={nom} onChange={e => setNom(e.target.value)}
               placeholder="Ex : Tajine de poulet aux olives"
               className="w-full rounded-2xl px-4 py-2.5 text-sm focus:outline-none border"
-              style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }}
+              style={inputStyle}
             />
           </div>
 
           {/* Cuisine + Type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold mb-1" style={{ color: '#8B5E3C' }}>Cuisine</label>
+              <label className="block text-xs font-bold mb-1" style={labelStyle}>Cuisine</label>
               <select value={cuisine} onChange={e => setCuisine(e.target.value as Cuisine)}
                 className="w-full rounded-2xl px-4 py-2.5 text-sm focus:outline-none border"
-                style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }}
+                style={inputStyle}
               >
                 {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold mb-1" style={{ color: '#8B5E3C' }}>Type</label>
+              <label className="block text-xs font-bold mb-1" style={labelStyle}>Type</label>
               <select value={type} onChange={e => setType(e.target.value as TypeRecette)}
                 className="w-full rounded-2xl px-4 py-2.5 text-sm focus:outline-none border"
-                style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }}
+                style={inputStyle}
               >
                 {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -423,10 +426,10 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
               { label: 'Calories',    val: calories,     set: setCalories },
             ].map(f => (
               <div key={f.label}>
-                <label className="block text-xs font-bold mb-1" style={{ color: '#8B5E3C' }}>{f.label}</label>
+                <label className="block text-xs font-bold mb-1" style={labelStyle}>{f.label}</label>
                 <input type="number" min="0" value={f.val} onChange={e => f.set(e.target.value)}
                   className="w-full rounded-2xl px-3 py-2 text-sm focus:outline-none border"
-                  style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }}
+                  style={inputStyle}
                 />
               </div>
             ))}
@@ -435,23 +438,23 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           {/* Ingrédients */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold" style={{ color: '#8B5E3C' }}>Ingrédients</label>
-              <button onClick={addIngr} className="text-xs font-bold" style={{ color: '#E8622A' }}>+ Ajouter</button>
+              <label className="text-xs font-bold" style={labelStyle}>Ingrédients</label>
+              <button onClick={addIngr} className="text-xs font-bold" style={{ color: '#C8440A' }}>+ Ajouter</button>
             </div>
             <div className="space-y-2">
               {ingredients.map((ing, i) => (
                 <div key={i} className="flex gap-1.5">
                   <input value={ing.quantite} onChange={e => updIngr(i, 'quantite', e.target.value)}
                     placeholder="Qté" className="w-14 rounded-xl px-2 py-1.5 text-xs border focus:outline-none"
-                    style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }} />
+                    style={inputStyle} />
                   <input value={ing.unite} onChange={e => updIngr(i, 'unite', e.target.value)}
                     placeholder="Unité" className="w-16 rounded-xl px-2 py-1.5 text-xs border focus:outline-none"
-                    style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }} />
+                    style={inputStyle} />
                   <input value={ing.nom} onChange={e => updIngr(i, 'nom', e.target.value)}
                     placeholder="Ingrédient" className="flex-1 rounded-xl px-2 py-1.5 text-xs border focus:outline-none"
-                    style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }} />
+                    style={inputStyle} />
                   {ingredients.length > 1 && (
-                    <button onClick={() => removeIngr(i)} className="text-gray-300 hover:text-red-400 px-1">✕</button>
+                    <button onClick={() => removeIngr(i)} className="px-1" style={{ color: '#9A9A9A' }}>✕</button>
                   )}
                 </div>
               ))}
@@ -461,20 +464,20 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           {/* Instructions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold" style={{ color: '#8B5E3C' }}>Étapes</label>
-              <button onClick={addStep} className="text-xs font-bold" style={{ color: '#E8622A' }}>+ Étape</button>
+              <label className="text-xs font-bold" style={labelStyle}>Étapes</label>
+              <button onClick={addStep} className="text-xs font-bold" style={{ color: '#C8440A' }}>+ Étape</button>
             </div>
             <div className="space-y-2">
               {instructions.map((step, i) => (
                 <div key={i} className="flex gap-1.5">
                   <span className="w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0 mt-1.5"
-                    style={{ background: '#E8622A' }}>{i + 1}</span>
+                    style={{ background: '#C8440A' }}>{i + 1}</span>
                   <textarea value={step} onChange={e => updStep(i, e.target.value)}
                     rows={2} placeholder="Décrivez cette étape…"
                     className="flex-1 rounded-xl px-2 py-1.5 text-xs border focus:outline-none resize-none"
-                    style={{ borderColor: '#F0E6DC', background: '#FDF6F0', color: '#2C1810' }} />
+                    style={inputStyle} />
                   {instructions.length > 1 && (
-                    <button onClick={() => removeStep(i)} className="text-gray-300 hover:text-red-400 px-1">✕</button>
+                    <button onClick={() => removeStep(i)} className="px-1" style={{ color: '#9A9A9A' }}>✕</button>
                   )}
                 </div>
               ))}
@@ -482,10 +485,10 @@ function ModalAjout({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           </div>
         </div>
 
-        <div className="p-4 border-t" style={{ borderColor: '#F0E6DC' }}>
+        <div className="p-4 border-t" style={{ borderColor: '#333333' }}>
           <button onClick={handleSave} disabled={saving || !nom.trim()}
             className="w-full text-white font-bold py-3.5 rounded-full transition-colors disabled:opacity-50"
-            style={{ background: '#E8622A' }}
+            style={{ background: '#C8440A' }}
           >
             {saving ? '⏳ Enregistrement…' : '✓ Enregistrer la recette'}
           </button>
@@ -537,7 +540,7 @@ export default function Recettes() {
 
   if (loading) return (
     <div className="flex justify-center h-48 items-center">
-      <div className="spinner" style={{ color: '#E8622A' }} />
+      <div className="spinner" style={{ color: '#C8440A' }} />
     </div>
   )
 
@@ -546,12 +549,12 @@ export default function Recettes() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold" style={{ color: '#2C1810' }}>📖 Recettes</h1>
-          <p className="text-sm mt-0.5" style={{ color: '#8B5E3C' }}>{recettes.length} recettes disponibles</p>
+          <h1 className="font-display text-2xl font-bold" style={{ color: '#FFFFFF' }}>📖 Recettes</h1>
+          <p className="text-sm mt-0.5" style={{ color: '#9A9A9A' }}>{recettes.length} recettes disponibles</p>
         </div>
         <button onClick={() => setShowAjout(true)}
           className="text-white font-bold px-4 py-2.5 rounded-full text-sm shadow"
-          style={{ background: '#E8622A' }}
+          style={{ background: '#C8440A' }}
         >
           + Ajouter
         </button>
@@ -560,14 +563,14 @@ export default function Recettes() {
       {/* OCR highlight button */}
       <button onClick={() => setShowAjout(true)}
         className="w-full flex items-center gap-3 p-4 rounded-3xl border-2 border-dashed transition-colors"
-        style={{ borderColor: '#E8622A', background: 'rgba(232,98,42,0.04)' }}
+        style={{ borderColor: '#C8440A', background: 'rgba(200,68,10,0.06)' }}
       >
         <span className="text-3xl">📸</span>
         <div className="text-left">
-          <p className="font-bold text-sm" style={{ color: '#E8622A' }}>Ajouter une recette par photo</p>
-          <p className="text-xs" style={{ color: '#8B5E3C' }}>Prenez une photo, le texte est extrait automatiquement</p>
+          <p className="font-bold text-sm" style={{ color: '#C8440A' }}>Ajouter une recette par photo</p>
+          <p className="text-xs" style={{ color: '#9A9A9A' }}>Prenez une photo, le texte est extrait automatiquement</p>
         </div>
-        <span className="ml-auto text-lg" style={{ color: '#E8622A' }}>›</span>
+        <span className="ml-auto text-lg" style={{ color: '#C8440A' }}>›</span>
       </button>
 
       {/* Recherche */}
@@ -576,7 +579,7 @@ export default function Recettes() {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Rechercher une recette…"
           className="w-full rounded-full pl-11 pr-4 py-3 text-sm border focus:outline-none"
-          style={{ borderColor: '#F0E6DC', background: '#fff', color: '#2C1810', boxShadow: '0 2px 8px rgba(44,24,16,0.06)' }}
+          style={{ borderColor: '#333333', background: '#1C1C1C', color: '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
         />
       </div>
 
@@ -589,8 +592,8 @@ export default function Recettes() {
             <button key={c} onClick={() => setFiltreCuisine(c)}
               className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all border"
               style={active
-                ? { background: '#E8622A', color: '#fff', borderColor: '#E8622A' }
-                : { background: '#fff', color: '#8B5E3C', borderColor: '#F0E6DC' }
+                ? { background: '#C8440A', color: '#fff', borderColor: '#C8440A' }
+                : { background: '#1C1C1C', color: '#9A9A9A', borderColor: '#333333' }
               }
             >
               {cfg?.emoji} {c === 'toutes' ? 'Toutes' : c}
@@ -607,9 +610,9 @@ export default function Recettes() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-4xl" style={{ boxShadow: '0 2px 16px rgba(44,24,16,0.08)' }}>
+        <div className="text-center py-12 rounded-3xl" style={{ background: '#1C1C1C', boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
           <p className="text-4xl mb-3">🔍</p>
-          <p className="text-sm" style={{ color: '#8B5E3C' }}>Aucune recette trouvée</p>
+          <p className="text-sm" style={{ color: '#9A9A9A' }}>Aucune recette trouvée</p>
         </div>
       )}
 
