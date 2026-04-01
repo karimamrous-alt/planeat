@@ -36,6 +36,29 @@ INPUT_FILE  = Path(__file__).parent / "recettes.json"
 BATCH_SIZE  = 50   # lignes par requête POST
 DELAI_BATCH = 0.5  # secondes entre les batchs
 
+# Mots qui excluent une recette à l'import (marques, contenu indésirable)
+MOTS_EXCLUS = [
+    # Marques commerciales
+    "barilla", "panzani", "lustucru", "uncle ben", "kiri",
+    "vache qui rit", "président", "fleury michon", "herta",
+    "marie", "findus", "bonduelle", "william saurin", "la laitière",
+    "nestle", "maggi", "knorr", "liebig", "campbell", "heinz",
+    "weightwatchers", "weight watchers",
+    # Contenu sponsorisé/promotionnel
+    "sponsorisé", "partenaire", "offre", "promotion",
+    # Déjà filtrés dans l'app
+    "macaron", "asperge",
+    # Viandes/ingrédients hors charte
+    "porc", "sanglier", "jambon", "lardons", "alcool",
+    "abats", "foie", "rognons", "tripes", "agneau", "gigot", "mouton",
+    "chorizo", "pancetta", "prosciutto", "boudin",
+]
+
+def recette_exclue(nom: str) -> bool:
+    """Retourne True si le nom contient un mot exclu."""
+    n = nom.lower()
+    return any(m in n for m in MOTS_EXCLUS)
+
 # ---------------------------------------------------------------------------
 # Helpers HTTP
 # ---------------------------------------------------------------------------
@@ -246,11 +269,11 @@ def main():
             print(f"  ERREUR lors du reset : {r.status_code} {r.text[:100]}")
             sys.exit(1)
 
-    # Filtrer les recettes valides (nom + url non vides)
-    valides = [r for r in recettes if r.get("nom") and r.get("url")]
+    # Filtrer les recettes valides (nom + url non vides) + mots exclus
+    valides = [r for r in recettes if r.get("nom") and r.get("url") and not recette_exclue(r.get("nom", ""))]
     ignores = len(recettes) - len(valides)
     if ignores:
-        print(f"  {ignores} recettes ignorees (nom ou url manquant)")
+        print(f"  {ignores} recettes ignorees (nom/url manquant ou mot exclu)")
 
     print(f"Import de {len(valides)} recettes en batchs de {BATCH_SIZE}...\n")
 

@@ -65,6 +65,7 @@ const MOTS_INTERDITS = [
   'abats','foie ','rognons','tripes','agneau','gigot','mouton',
   'chorizo','pancetta','prosciutto','boudin',
   'macaron','asperge',
+  'barilla','panzani','lustucru','sponsorisé','partenaire','offre','promotion',
 ]
 
 const MOTS_LOURD = ['tajine','couscous','gratin','lasagne','cassoulet']
