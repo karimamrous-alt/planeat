@@ -1,7 +1,7 @@
 export const runtime = 'edge'
 
 import type { Metadata } from 'next'
-import { Playfair_Display, Inter } from 'next/font/google'
+import { Playfair_Display, Nunito } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/Navigation'
 import { VERSION } from '@/lib/version'
@@ -12,9 +12,9 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
-const inter = Inter({
+const nunito = Nunito({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-nunito',
   display: 'swap',
 })
 
@@ -25,14 +25,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${playfair.variable} ${inter.variable}`}>
-      <body className="font-sans min-h-screen" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+    <html lang="fr" className={`${playfair.variable} ${nunito.variable}`}>
+      <body className="font-sans min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-md border-b" style={{ background: 'rgba(13,13,13,0.92)', borderColor: '#333333' }}>
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-orange-100 shadow-sm">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
             <div className="flex items-baseline gap-2">
-              <span className="font-display text-2xl font-bold" style={{ color: '#C8440A' }}>PlanEat</span>
-              <span className="text-xs font-semibold" style={{ color: '#9A9A9A' }}>{VERSION}</span>
+              <span className="font-display text-2xl font-bold" style={{ color: '#E8622A' }}>PlanEat</span>
+              <span className="text-xs font-semibold" style={{ color: '#C4956A' }}>{VERSION}</span>
             </div>
             <span className="text-xl">🍽️</span>
           </div>
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Footer */}
         <footer className="max-w-2xl mx-auto px-4 pb-32 text-center">
-          <p className="text-xs" style={{ color: '#9A9A9A' }}>PlanEat {VERSION}</p>
+          <p className="text-xs" style={{ color: '#C4956A' }}>PlanEat {VERSION}</p>
         </footer>
 
         {/* Bottom navigation */}

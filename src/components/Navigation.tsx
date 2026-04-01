@@ -17,8 +17,8 @@ export default function Navigation() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-md border-t"
-      style={{ background: 'rgba(28,28,28,0.97)', borderColor: '#333333', boxShadow: '0 -4px 24px rgba(0,0,0,0.5)' }}
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-orange-100"
+      style={{ boxShadow: '0 -4px 24px rgba(44,24,16,0.10)' }}
     >
       <div className="max-w-2xl mx-auto flex justify-around items-center h-16 px-2">
         {liens.map(l => {
@@ -26,7 +26,7 @@ export default function Navigation() {
           return (
             <Link key={l.href} href={l.href}
               className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-2xl transition-all min-w-[44px]"
-              style={active ? { color: '#C8440A' } : { color: '#9A9A9A' }}
+              style={active ? { color: '#E8622A' } : { color: '#8B5E3C' }}
             >
               <span
                 className="text-xl leading-none transition-transform"
@@ -36,14 +36,14 @@ export default function Navigation() {
               </span>
               <span
                 className="text-[10px] font-semibold leading-none"
-                style={active ? { color: '#C8440A' } : { color: '#9A9A9A' }}
+                style={active ? { color: '#E8622A' } : { color: '#8B5E3C' }}
               >
                 {l.label}
               </span>
               {active && (
                 <span
                   className="w-1 h-1 rounded-full mt-0.5"
-                  style={{ background: '#C8440A' }}
+                  style={{ background: '#E8622A' }}
                 />
               )}
             </Link>

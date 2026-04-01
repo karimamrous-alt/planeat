@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --bg:         #0D0D0D;
-  --card:       #1C1C1C;
-  --secondary:  #2A2A2A;
-  --accent:     #C8440A;
-  --gold:       #EF9F27;
-  --text:       #FFFFFF;
-  --text-mid:   #9A9A9A;
-  --border:     #333333;
-  --shadow-card: 0 2px 20px 0 rgba(0,0,0,0.5);
+  --primary:    #E8622A;
+  --secondary:  #F5A623;
+  --bg-warm:    #FDF6F0;
+  --text-dark:  #2C1810;
+  --text-mid:   #8B5E3C;
+  --season:     #4CAF50;
+  --shadow-card: 0 2px 16px 0 rgba(44,24,16,0.08);
 }
 
-html { color-scheme: dark; }
+html { color-scheme: light; }
 
 body {
-  background-color: #0D0D0D;
-  color: #FFFFFF;
+  background-color: #FDF6F0;
+  background-image: radial-gradient(circle, rgba(232,98,42,0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: #2C1810;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -46,11 +46,10 @@ body {
   animation: spin-anim 0.7s linear infinite;
 }
 
-/* Photo placeholders cuisine — dark-mode tints */
-.ph-marocaine { background: linear-gradient(135deg,#7C2D12,#9A3412); }
-.ph-française { background: linear-gradient(135deg,#1E3A5F,#1D4ED8 80%); }
-.ph-italienne { background: linear-gradient(135deg,#7C1D1D,#991B1B); }
-.ph-végé      { background: linear-gradient(135deg,#14532D,#15803D); }
-.ph-rapide    { background: linear-gradient(135deg,#78350F,#92400E); }
-.ph-indienne  { background: linear-gradient(135deg,#713F12,#A16207); }
-.ph-default   { background: linear-gradient(135deg,#1C1C1C,#2A2A2A); }
+/* Photo placeholders cuisine */
+.ph-marocaine { background: linear-gradient(135deg,#FED7AA,#FDBA74); }
+.ph-française { background: linear-gradient(135deg,#BFDBFE,#93C5FD); }
+.ph-italienne { background: linear-gradient(135deg,#FECACA,#FCA5A5); }
+.ph-végé      { background: linear-gradient(135deg,#BBF7D0,#86EFAC); }
+.ph-rapide    { background: linear-gradient(135deg,#FDE68A,#FCD34D); }
+.ph-default   { background: linear-gradient(135deg,#E5E7EB,#D1D5DB); }
