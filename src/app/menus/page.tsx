@@ -64,6 +64,7 @@ const MOTS_INTERDITS = [
   'porc','sanglier','jambon','lardons','lard ','alcool','vin ','bière','champagne',
   'abats','foie ','rognons','tripes','agneau','gigot','mouton',
   'chorizo','pancetta','prosciutto','boudin',
+  'macaron','asperge',
 ]
 
 const MOTS_LOURD = ['tajine','couscous','gratin','lasagne','cassoulet']
@@ -473,9 +474,19 @@ export default function Menus() {
 
 // ── Modal recette ─────────────────────────────────────────────────────────────
 
-function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () => void }) {
+function RecetteModal({ recette: r, onClose, onDeleted }: { recette: Recette; onClose: () => void; onDeleted?: (id: string) => void }) {
   const cfg = CUISINE_CONFIG[r.cuisine] ?? { emoji: '🍴', bgClass: 'bg-gray-50 border-gray-200', colorClass: 'text-gray-600', ph: 'ph-default' }
   const { astuces, variante } = getAstuces(r)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!confirm(`Supprimer "${r.nom}" définitivement ?`)) return
+    setDeleting(true)
+    await supabase.from('recettes').delete().eq('id', r.id)
+    setDeleting(false)
+    onDeleted?.(r.id)
+    onClose()
+  }
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -609,6 +620,18 @@ function RecetteModal({ recette: r, onClose }: { recette: Recette; onClose: () =
               )}
             </div>
           )}
+
+          {/* Suppression */}
+          <div className="mt-6 pt-5 border-t" style={{ borderColor: '#F0E6DC' }}>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="w-full py-3 rounded-full text-sm font-bold border transition-colors disabled:opacity-50"
+              style={{ color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2' }}
+            >
+              {deleting ? '⏳ Suppression…' : '🗑 Supprimer cette recette'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

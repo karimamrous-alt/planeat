@@ -140,14 +140,25 @@ function CarteRecette({ rec, onClick }: { rec: Recette; onClick: () => void }) {
 
 // ── Modal détail ──────────────────────────────────────────────────────────────
 
-function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
-  rec: Recette; onClose: () => void; onToggleFavori: () => void; isFavori: boolean
+function ModalDetail({ rec, onClose, onToggleFavori, isFavori, onDeleted }: {
+  rec: Recette; onClose: () => void; onToggleFavori: () => void; isFavori: boolean; onDeleted: (id: string) => void
 }) {
   const cfg = CUISINE_CONFIG[rec.cuisine] ?? { emoji: '🍴', colorClass: 'text-gray-600', bgClass: 'bg-gray-50 border-gray-200', ph: 'ph-default' }
   const { astuces, variante } = getAstuces(rec)
   const total = rec.temps_prep + rec.temps_cuisson
   const lignes = parseIngredients(rec.ingredients)
   const [photoUrl, setPhotoUrl] = useState(rec.photo_url || '')
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!confirm(`Supprimer "${rec.nom}" définitivement ?`)) return
+    setDeleting(true)
+    await supabase.from('recettes').delete().eq('id', rec.id)
+    setDeleting(false)
+    onDeleted(rec.id)
+    onClose()
+  }
+
   useEffect(() => {
     if (!rec.photo_url) {
       getUnsplashPhoto(rec.nom).then(url => { if (url) setPhotoUrl(url) })
@@ -241,6 +252,18 @@ function ModalDetail({ rec, onClose, onToggleFavori, isFavori }: {
               )}
             </div>
           )}
+
+          {/* Suppression */}
+          <div className="p-5 border-t" style={{ borderColor: '#F0E6DC' }}>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="w-full py-3 rounded-full text-sm font-bold border transition-colors disabled:opacity-50"
+              style={{ color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2' }}
+            >
+              {deleting ? '⏳ Suppression…' : '🗑 Supprimer cette recette'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -619,6 +642,7 @@ export default function Recettes() {
           isFavori={favorisIds.has(selected.id)}
           onToggleFavori={() => toggleFavori(selected)}
           onClose={() => setSelected(null)}
+          onDeleted={(id) => { setRecettes(p => p.filter(r => r.id !== id)); setSelected(null) }}
         />
       )}
 
